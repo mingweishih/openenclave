@@ -48,6 +48,11 @@ void test(oe_enclave_t* enclave)
 
 void host_exit(int arg)
 {
+    // Ensure all the threads terminate before the exit
+    for (auto& t : _host_thread_list)
+    {
+        t.join();
+    }
     exit(arg);
 }
 
