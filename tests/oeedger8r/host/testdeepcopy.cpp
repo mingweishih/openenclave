@@ -186,6 +186,16 @@ void test_deepcopy_edl_ecalls(oe_enclave_t* enclave)
     }
 
     {
+        CountStruct s{};
+        uint64_t p[3] = {0, 0, 0};
+        s.ptr = p;
+        OE_TEST(deepcopy_out_only_count(enclave, &s) == OE_OK);
+        OE_TEST(s.count == 7);
+        OE_TEST(s.size == 64);
+        test_struct(s, 3);
+    }
+
+    {
         IOVEC iov[2];
         char buf0[8] = "red";
 

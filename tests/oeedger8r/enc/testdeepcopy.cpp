@@ -216,6 +216,18 @@ void deepcopy_out_count(CountStruct* s)
         s->ptr[i] = data[i];
 }
 
+void deepcopy_out_only_count(CountStruct* s)
+{
+    OE_TEST(s->count == 0);
+    OE_TEST(s->size == 0);
+    for (size_t i = 0; i < 3; ++i)
+        OE_TEST(s->ptr[i] == 0);
+    s->count = 7;
+    s->size = 64;
+    for (size_t i = 0; i < 3; ++i)
+        s->ptr[i] = data[i];
+}
+
 void deepcopy_iovec(IOVEC* iov, size_t n)
 {
     OE_TEST(!(n && !iov));

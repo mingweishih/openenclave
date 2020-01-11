@@ -115,6 +115,10 @@ enclave {
     // should take place.
     public void deepcopy_out_count([in, out, count=1] CountStruct* s);
 
+    // Deep copy of one `CountStruct` with an embedded array out
+    // should take place.
+    public void deepcopy_out_only_count([out, count=1] CountStruct* s);
+
     // Test a real-world scenario.
     public void deepcopy_iovec([in, out, count=n] IOVEC* iov, size_t n);
   };
