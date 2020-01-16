@@ -181,6 +181,12 @@ option(ADD_WINDOWS_ENCLAVE_TESTS "Build Windows enclave tests" OFF)
 # Warning: turning on simulation mode on Windows may cause test failures and random crashes
 option(WIN32_SIMULATION "Windows Simulation Mode" OFF)
 
+# Obtain compiler information of the pre-built tests
+include(get_compiler_info)
+if (ADD_WINDOWS_ENCLAVE_TESTS AND NOT BUILD_ENCLAVES)
+  get_compiler_info()
+endif()
+
 find_program(VALGRIND "valgrind")
 if (VALGRIND)
   set(MEMORYCHECK_COMMAND_OPTIONS "--leak-check=full --error-exitcode=1")
