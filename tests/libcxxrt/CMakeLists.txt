@@ -20,9 +20,9 @@ if(BUILD_ENCLAVES)
 			add_executable(${name}
 				enc/${name}.cpp
 			)
-			target_compile_options(${name} PRIVATE
-				-Wno-error
-			)
+            target_compile_options(${name} PRIVATE
+                -Wno-error
+             )
 			
 			# Generating expected output with system-test
 			add_custom_target(test-expected-${name}-output ALL
