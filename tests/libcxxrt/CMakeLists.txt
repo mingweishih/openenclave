@@ -17,19 +17,46 @@ if(BUILD_ENCLAVES)
         if("${name}" STREQUAL "test_foreign_exceptions")
             add_enclave_test(tests/libcxxrt/${name} libcxxrt_host libcxxrttest-${name}_enc)
         else()
-            add_executable(${name}
-                enc/${name}.cpp
-            )
-            target_compile_options(${name} PRIVATE
-                -Wno-error
-            )
+            if (UNIX)
+                add_executable(${name}
+                    enc/${name}.cpp
+                )
+                target_compile_options(${name} PRIVATE
+                    -Wno-error
+                )
 
-            # Generating expected output with system-test
-            add_custom_target(test-expected-${name}-output ALL
-                COMMAND ${name} > ${PROJECT_BINARY_DIR}/tests/libcxxrt/exp_${name}_output.log 2>&1
-                DEPENDS ${name})
-            # Running Enclave test & comparing with normal test
-            add_test(tests/libcxxrt/${name} run_test.sh "./host/libcxxrt_host ./enc/libcxxrttest-${name}_enc" exp_${name}_output.log ${name}_output.log)
+                # Generating expected output with system-test
+                add_custom_target(test-expected-${name}-output ALL
+                    COMMAND ${name} > ${PROJECT_BINARY_DIR}/tests/libcxxrt/exp_${name}_output.log 2>&1
+                    DEPENDS ${name})
+                # Running Enclave test & comparing with normal test
+                add_test(tests/libcxxrt/${name} run_test.sh "./host/libcxxrt_host ./enc/libcxxrttest-${name}_enc" exp_${name}_output.log ${name}_output.log)
+            else()
+                file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/run.bat DESTINATION ${PROJECT_BINARY_DIR}/tests/libcxxrt/)
+                #file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/exp_${name}_output.log DESTINATION ${PROJECT_BINARY_DIR}/tests/libcxxrt/)
+                # Running Enclave test & comparing with normal test
+                add_custom_command(
+                    OUTPUT exp_${name}_output.log
+                    COMMAND ${CMAKE_COMMAND} -E
+                    copy ${CMAKE_CURRENT_SOURCE_DIR}/exp_${name}_output.log ${PROJECT_BINARY_DIR}/tests/libcxxrt/
+                    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libcxxrt/
+                )
+                add_custom_command(
+                    OUTPUT ${name}_output.log
+                    DEPENDS ${PROJECT_BINARY_DIR}/tests/libcxxrt/host/libcxxrt_host.exe ${PROJECT_BINARY_DIR}/tests/libcxxrt/enc/libcxxrttest-${name}_enc
+                    COMMAND cmd /c run.bat "${PROJECT_BINARY_DIR}/tests/libcxxrt/host/libcxxrt_host.exe"
+                    "${PROJECT_BINARY_DIR}/tests/libcxxrt/enc/libcxxrttest-${name}_enc" ${name}_output.log
+                    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/tests/libcxxrt/
+                )
+                # add a custom target to ALL so that this step always needs to be run if
+                # this function is invoked
+                add_custom_target(${name}.windows ALL
+                    DEPENDS  ${name}_output.log exp_${name}_output.log
+                )
+                add_test(tests/libcxxrt/${name}
+                    ${CMAKE_COMMAND} -E compare_files exp_${name}_output.log ${name}_output.log
+                )
+            endif()
         endif()
     endforeach(testcase)
 
@@ -66,7 +93,7 @@ elseif (ADD_WINDOWS_ENCLAVE_TESTS)
                 copy ${linux_log_file_path} ${windows_log_path}/exp_${name}_output.log # copy Linux generated log
                 COMMAND ${CMAKE_COMMAND} -E
                 copy ${LINUX_BIN_DIR}/libcxxrt/enc/libcxxrttest-${name}_enc
-                ${PROJECT_BINARY_DIR}/tests/${TEST_DIR}/host/libcxxrttest-${name}_enc #copy Singned File to windows host folder
+                ${PROJECT_BINARY_DIR}/tests/${TEST_DIR}/host/libcxxrttest-${name}_enc # copy Signed File to windows host folder
                 WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
             )
 
