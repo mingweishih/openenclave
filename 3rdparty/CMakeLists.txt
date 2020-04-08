@@ -12,6 +12,10 @@ add_subdirectory(libcxxrt)
 add_subdirectory(libunwind)
 add_subdirectory(musl)
 add_subdirectory(mbedtls)
+if (CODE_COVERAGE_TEST)
+  add_subdirectory(libgcov)
+endif()
+
 if (OE_TRUSTZONE)
   # EL: (ARM) Exception Level
   # GP: GlobalPlatform

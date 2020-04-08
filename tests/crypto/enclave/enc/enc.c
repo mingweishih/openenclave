@@ -188,6 +188,10 @@ void test()
 {
     oe_register_syscall_hook(_syscall_hook);
     TestAll();
+
+#ifdef CODE_COVERAGE_TEST // For code coverage tests.
+    oe_register_syscall_hook(NULL);
+#endif
 }
 
 OE_SET_ENCLAVE_SGX(

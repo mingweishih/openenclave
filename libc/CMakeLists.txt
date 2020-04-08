@@ -226,6 +226,7 @@ add_enclave_library(oelibc STATIC
     ${MUSLSRC}/locale/wcsxfrm.c
     ${MUSLSRC}/linux/mount.c
     ${MUSLSRC}/linux/epoll.c
+    ${MUSLSRC}/linux/flock.c
     ${MUSLSRC}/math/acos.c
     ${MUSLSRC}/math/acosf.c
     ${MUSLSRC}/math/acosh.c
@@ -439,6 +440,7 @@ add_enclave_library(oelibc STATIC
     ${MUSLSRC}/misc/nftw.c
     ${MUSLSRC}/misc/uname.c
     ${MUSLSRC}/mman/mmap.c
+    ${MUSLSRC}/mman/msync.c
     ${MUSLSRC}/mman/munmap.c
     ${MUSLSRC}/multibyte/btowc.c
     ${MUSLSRC}/multibyte/c16rtomb.c

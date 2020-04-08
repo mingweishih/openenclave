@@ -56,6 +56,9 @@ function(add_mbed_test_enclave NAME)
 
   enclave_compile_options(mbedtest_suite_${NAME} PRIVATE -Wno-error)
   enclave_compile_definitions(mbedtest_suite_${NAME} PRIVATE -D__TEST__="${NAME}")
+  if (CODE_COVERAGE_TEST)
+    enclave_compile_definitions(mbedtest_suite_${NAME} PRIVATE CODE_COVERAGE_TEST)
+  endif()
   enclave_include_directories(mbedtest_suite_${NAME} PRIVATE
     ..
     ${PROJECT_SOURCE_DIR}/3rdparty/mbedtls/mbedtls/tests

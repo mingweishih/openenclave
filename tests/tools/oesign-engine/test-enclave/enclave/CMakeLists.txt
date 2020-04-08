@@ -17,4 +17,7 @@ target_compile_definitions(enclave PUBLIC OE_API_VERSION=2)
 # Need for the generated file helloworld_t.h
 target_include_directories(enclave PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
+if (CODE_COVERAGE_TEST)
+  target_link_libraries(enclave gcov oehostfs)
+endif ()
 target_link_libraries(enclave oeenclave oelibc)
