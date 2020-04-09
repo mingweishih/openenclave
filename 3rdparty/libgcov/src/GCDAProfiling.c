@@ -33,6 +33,7 @@
 #else
 #include <sys/mman.h>
 #include <sys/file.h>
+#include <sys/mount.h>
 #endif
 
 #if defined(__FreeBSD__) && defined(__i386__)
@@ -58,10 +59,17 @@ typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 #endif
 
+/* Beginning of the OE modfication */
+#include "openenclave/bits/module.h"
+#include "openenclave/bits/fs.h"
+/* End of the OE modification */
+
 #include "InstrProfiling.h"
 #include "InstrProfilingUtil.h"
 
 /* #define DEBUG_GCDAPROFILING */
+
+/* #define DEBUG_OEGCDA */
 
 /*
  * --- GCOV file format I/O primitives ---
@@ -160,6 +168,7 @@ static void fn_list_remove(struct fn_list* list) {
 }
 
 static void resize_write_buffer(uint64_t size) {
+  //fprintf(stderr, "[resize_write_buffer] new_file: %d\n", new_file);
   if (!new_file) return;
   size += cur_pos;
   if (size <= cur_buffer_size) return;
@@ -255,28 +264,49 @@ static int map_file() {
   if (file_size == 0)
     return -1;
 
+#if 0  // mmap is not supported by OE.
   write_buffer = mmap(0, file_size, PROT_READ | PROT_WRITE,
                       MAP_FILE | MAP_SHARED, fd, 0);
+#endif
+
+#ifdef DEBUG_OEGCDA
+  fprintf(stderr, "[map_file]: %d\n", pthread_self());
+#endif
+
+  write_buffer = malloc(file_size);
   if (write_buffer == (void *)-1) {
     int errnum = errno;
     fprintf(stderr, "profiling: %s: cannot map: %s\n", filename,
             strerror(errnum));
     return -1;
   }
+  fseek(output_file, 0L, SEEK_SET);
+  fread(write_buffer, file_size, 1, output_file);
   return 0;
 }
 
 static void unmap_file() {
+#if 0 // msync is not supported by OE.
   if (msync(write_buffer, file_size, MS_SYNC) == -1) {
     int errnum = errno;
     fprintf(stderr, "profiling: %s: cannot msync: %s\n", filename,
             strerror(errnum));
   }
+#endif
+
+#ifdef DEBUG_OEGCDA
+  fprintf(stderr, "[unmap_file]: %d\n", pthread_self());
+#endif
+  fseek(output_file, 0L, SEEK_SET);
+  fwrite(write_buffer, file_size, 1, output_file);
 
   /* We explicitly ignore errors from unmapping because at this point the data
    * is written and we don't care.
    */
+#if 0 // munmap is not supported by OE.
   (void)munmap(write_buffer, file_size);
+#endif
+  free(write_buffer);
   write_buffer = NULL;
   file_size = 0;
 }
@@ -298,6 +328,9 @@ void llvm_gcda_start_file(const char *orig_filename, const char version[4],
   /* Try just opening the file. */
   new_file = 0;
   fd = open(filename, O_RDWR | O_BINARY);
+#ifdef DEBUG_OEGCDA
+  fprintf(stderr, "[llvm_gcda_start_file] %s, fd: %d\n", filename, fd);
+#endif
 
   if (fd == -1) {
     /* Try opening the file, creating it if necessary. */
@@ -597,6 +630,23 @@ void llvm_gcov_init(fn_ptr wfn, fn_ptr ffn) {
 
   if (atexit_ran == 0) {
     atexit_ran = 1;
+
+    /* Beginning of the OE modfication */
+    if (oe_load_module_host_file_system() != OE_OK) {
+      fprintf(stderr, "oe_load_module_host_file_system() failed\n");
+      exit(1);
+    }
+
+    if (mount("/", "/", OE_HOST_FILE_SYSTEM, 0, NULL) != 0) {
+      fprintf(stderr, "[llvm_gcov_init] mount() failed\n");
+      exit(1);
+
+    }
+    // Workaround: Force to install the atexit handler of fdtable
+    //             prioir to the llvm handler.
+    FILE *f = fopen("/dev/null", "r");
+    fclose(f);
+    /* End of the OE modification */
 
     /* Make sure we write out the data and delete the data structures. */
     atexit(llvm_delete_flush_function_list);

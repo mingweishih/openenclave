@@ -11,6 +11,11 @@ enclave_include_directories(oehostsock PRIVATE
     ${CMAKE_BINARY_DIR}/syscall
     ${PROJECT_SOURCE_DIR}/include/openenclave/corelibc)
 
+if (CODE_COVERAGE_TEST)
+    # Enable code coverage.
+    enclave_compile_options(oehostsock PRIVATE -fprofile-arcs -ftest-coverage)
+endif()
+
 enclave_link_libraries(oehostsock oesyscall)
 
 install_enclaves(TARGETS oehostsock EXPORT openenclave-targets ARCHIVE

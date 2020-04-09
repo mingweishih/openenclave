@@ -204,6 +204,33 @@ if (NOT USE_SNMALLOC)
 endif ()
 
 option(CODE_COVERAGE_TEST "Enable code coverage test" OFF)
+if (CODE_COVERAGE_TEST)
+  add_custom_target(code_coverage
+    COMMAND mkdir -p coverage
+    COMMAND lcov -c -i -d ${CMAKE_BINARY_DIR} --gcov-tool ${OE_SCRIPTSDIR}/llvm-gcov -o coverage/base.info
+    #COMMAND ctest
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+  set(FILTERED_LIST
+      "'${PROJECT_SOURCE_DIR}/tests/*'"
+      "'${PROJECT_SOURCE_DIR}/3rdparty/*'"
+      "'${CMAKE_BINARY_DIR}/tests/*'"
+      "'${CMAKE_BINARY_DIR}/3rdparty/*'")
+
+  add_custom_command(TARGET code_coverage
+    COMMAND lcov -d ${CMAKE_BINARY_DIR} --gcov-tool ${OE_SCRIPTSDIR}/llvm-gcov -c -o cov.info
+    COMMAND lcov --remove cov.info ${FILTERED_LIST} -o cov_filtered.info
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/coverage)
+
+  add_custom_target(code_coverage_genhtml
+    COMMAND rm -rf ${CMAKE_BINARY_DIR}/coverage/html
+    COMMAND genhtml -q --ignore-errors source cov_filtered.info --legend --title "Open Enclave Code Coverage" -o ${CMAKE_BINARY_DIR}/coverage/html
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/coverage)
+
+  add_custom_target(code_coverage_clean
+    COMMAND find ${CMAKE_BINARY_DIR} -type f -name '*.gcda' -delete
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endif()
 
 find_program(VALGRIND "valgrind")
 if (VALGRIND)

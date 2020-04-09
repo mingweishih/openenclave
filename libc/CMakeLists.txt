@@ -440,7 +440,6 @@ add_enclave_library(oelibc STATIC
     ${MUSLSRC}/misc/nftw.c
     ${MUSLSRC}/misc/uname.c
     ${MUSLSRC}/mman/mmap.c
-    ${MUSLSRC}/mman/msync.c
     ${MUSLSRC}/mman/munmap.c
     ${MUSLSRC}/multibyte/btowc.c
     ${MUSLSRC}/multibyte/c16rtomb.c
@@ -860,6 +859,11 @@ enclave_compile_definitions(oelibc PRIVATE _XOPEN_SOURCE=700)
 if (USE_DEBUG_MALLOC)
   enclave_compile_definitions(oelibc PRIVATE OE_USE_DEBUG_MALLOC)
 endif ()
+
+if (CODE_COVERAGE_TEST)
+    # Enable code coverage.
+    enclave_compile_options(oelibc PRIVATE -fprofile-arcs -ftest-coverage)
+endif()
 
 # This project (and its dependents) require the enclave headers and
 # library, and the musl headers.

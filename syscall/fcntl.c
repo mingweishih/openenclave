@@ -43,8 +43,8 @@ int oe_open(const char* pathname, int flags, oe_mode_t mode)
         OE_RAISE_ERRNO(oe_errno);
 
     if (!(file = fs->ops.fs.open(fs, filepath, flags, mode)))
-        OE_RAISE_ERRNO_MSG(oe_errno, "pathname=%s", pathname);
 
+        goto done;
     if ((fd = oe_fdtable_assign(file)) == -1)
         OE_RAISE_ERRNO(oe_errno);
 

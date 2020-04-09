@@ -315,8 +315,8 @@ endif()
 enclave_compile_options(oecore INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
 
 if (CODE_COVERAGE_TEST)
-    # Code coverage
-    target_compile_options(oecore PUBLIC -fprofile-arcs -ftest-coverage)
+    # Enable code coverage.
+    enclave_compile_options(oecore PRIVATE -fprofile-arcs -ftest-coverage)
     set_source_files_properties(once.c PROPERTIES
         COMPILE_FLAGS -fno-profile-arcs)
     set_source_files_properties(sgx/calls.c PROPERTIES

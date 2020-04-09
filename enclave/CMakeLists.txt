@@ -44,6 +44,11 @@ if(CMAKE_C_COMPILER_ID MATCHES GNU)
   endif()
 endif()
 
+if (CODE_COVERAGE_TEST)
+    # Enable code coverage.
+    enclave_compile_options(oeenclave PRIVATE -fprofile-arcs -ftest-coverage)
+endif()
+
 # Add location of the oeedger8r-generated trusted headers for internal
 # functions implemented via EDL files.
 enclave_include_directories(oeenclave PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/core)
