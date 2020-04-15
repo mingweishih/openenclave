@@ -42,3 +42,6 @@ else ()
   add_test(NAME samples
            COMMAND ${CMAKE_COMMAND} -DHAS_QUOTE_PROVIDER=${HAS_QUOTE_PROVIDER} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR} -DBUILD_DIR=${PROJECT_BINARY_DIR} -DPREFIX_DIR=${CMAKE_INSTALL_PREFIX} -P ${CMAKE_CURRENT_SOURCE_DIR}/test-samples.cmake)
 endif ()
+
+# Workaround: Set sufficient timeout for the sample test.
+set_tests_properties(samples PROPERTIES TIMEOUT 960)
