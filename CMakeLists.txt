@@ -203,8 +203,9 @@ if (NOT USE_SNMALLOC)
   set(USE_DLMALLOC true)
 endif ()
 
-option(CODE_COVERAGE_TEST "Enable code coverage test" OFF)
-if (CODE_COVERAGE_TEST)
+option(CODE_COVERAGE "Enable code coverage test" OFF)
+if (CODE_COVERAGE)
+  message("-- CODE_COVERAGE set - enable code coverage tests")
   add_custom_target(code_coverage
     COMMAND mkdir -p coverage
     COMMAND lcov -c -i -d ${CMAKE_BINARY_DIR} --gcov-tool ${OE_SCRIPTSDIR}/llvm-gcov -o coverage/base.info

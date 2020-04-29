@@ -198,7 +198,7 @@ int test(
     strncpy(out_testname, __TEST__, STRLEN);
     out_testname[STRLEN - 1] = '\0';
 
-#ifdef CODE_COVERAGE_TEST
+#ifdef CODE_COVERAGE
     oe_register_syscall_hook(NULL);
 #endif
 

@@ -5,7 +5,7 @@ add_subdirectory(cpio)
 add_subdirectory(socket)
 
 # Skip the filesystem-related tests when doing code coverage tests.
-if (NOT CODE_COVERAGE_TEST)
+if (NOT CODE_COVERAGE)
   add_subdirectory(dup)
   add_subdirectory(fs)
   add_subdirectory(hostfs)

@@ -12,7 +12,7 @@ add_subdirectory(libcxxrt)
 add_subdirectory(libunwind)
 add_subdirectory(musl)
 add_subdirectory(mbedtls)
-if (CODE_COVERAGE_TEST)
+if (CODE_COVERAGE)
   add_subdirectory(libgcov)
 endif()
 

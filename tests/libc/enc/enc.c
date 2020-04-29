@@ -41,7 +41,7 @@ int device_init()
     OE_TEST(oe_load_module_host_socket_interface() == OE_OK);
     // OE_TEST(oe_load_module_host_epoll() == OE_OK);
 
-#ifndef CODE_COVERAGE_TEST
+#ifndef CODE_COVERAGE
     OE_TEST(mount("/", "/", OE_HOST_FILE_SYSTEM, 0, NULL) == 0);
 #endif
     return 0;

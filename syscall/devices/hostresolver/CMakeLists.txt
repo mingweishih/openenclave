@@ -11,7 +11,7 @@ enclave_include_directories(oehostresolver PRIVATE
     ${CMAKE_BINARY_DIR}/syscall
     ${PROJECT_SOURCE_DIR}/include/openenclave/corelibc)
 
-if (CODE_COVERAGE_TEST)
+if (CODE_COVERAGE)
     # Enable code coverage.
     enclave_compile_options(oehostresolver PRIVATE -fprofile-arcs -ftest-coverage)
 endif()

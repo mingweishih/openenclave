@@ -1,6 +1,6 @@
 # Code Coverage Test in OE
 
-This document shows how to do code coverage tests on OE
+This document shows how to do code coverage tests in OE.
 The code coverage test is based on GCOV, a source-based code coverage implementation provided by GCC.
 Currently, both LLVM and GCC supports GCOV.
 
@@ -10,9 +10,13 @@ The workflow of GCOV typically consists of following phases:
 - Runtime data collection
 - Offline analysis (e.g., create reports)
 
-# Compile-Time Instrumentation
+# Prerequisite
 
-Currently, both LLVM and GCC support the GCOV.
+Install the front-end tool `tool`, which is used to analyze the GCOV-based coverage data.
+
+`sudo apt install lcov`
+
+# Compile-Time Instrumentation
 
 On LLVM, compile the code with `-fprofile-arcs -ftest-coverage` options.
 
@@ -64,7 +68,7 @@ The following instructions shows how to enable the GCOV on OE (assume inside the
 ```
 mkdir build
 cd build
-cmake .. -DCODE_COVERAGE_TEST=ON
+cmake .. -DCODE_COVERAGE=ON
 ```
 
 # Runtime Data Collection

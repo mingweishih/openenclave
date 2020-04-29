@@ -18,9 +18,9 @@ add_enclave_library(oecryptombed STATIC
 
 maybe_build_using_clangw(oecryptombed)
 
-if (CODE_COVERAGE_TEST)
+if (CODE_COVERAGE)
     # Enable code coverage.
-    enclave_compile_options(oecryptombed PRIVATE -fprofile-arcs -ftest-coverage)
+    enclave_compile_options(oecryptombed PRIVATE -g -O0 -fprofile-arcs -ftest-coverage)
 endif()
 
 enclave_link_libraries(oecryptombed PUBLIC mbedcrypto)

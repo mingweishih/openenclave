@@ -10,9 +10,9 @@ add_custom_command(
 
 add_enclave(TARGET code_coverage_enc UUID 71b0822f-42a3-4543-a97c-ca491f76b82c SOURCES enc.c ${CMAKE_CURRENT_BINARY_DIR}/code_coverage_t.c)
 
-if (CODE_COVERAGE_TEST)
+if (CODE_COVERAGE)
     # Enable code coverage.
-    enclave_compile_options(oehostresolver PRIVATE -fprofile-arcs -ftest-coverage)
+    enclave_compile_options(oehostresolver PRIVATE -g -O0 -fprofile-arcs -ftest-coverage)
 endif()
 
 enclave_include_directories(code_coverage_enc PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

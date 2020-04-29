@@ -50,9 +50,9 @@ add_enclave_library(oesyscall STATIC
 
 maybe_build_using_clangw(oesyscall)
 
-if (CODE_COVERAGE_TEST)
+if (CODE_COVERAGE)
     # Enable code coverage.
-    enclave_compile_options(oesyscall PRIVATE -fprofile-arcs -ftest-coverage)
+    enclave_compile_options(oesyscall PRIVATE -g -O0 -fprofile-arcs -ftest-coverage)
 endif()
 
 add_enclave_dependencies(oesyscall syscall_trusted_edl)

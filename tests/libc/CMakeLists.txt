@@ -10,7 +10,7 @@ endif()
 include(./tests.cmake)
 
 # Run the tests separately for the code coverage test.
-if (CODE_COVERAGE_TEST)
+if (CODE_COVERAGE)
     set(OE_SEPARATE_LIBC_TESTS ON)
 endif()
 

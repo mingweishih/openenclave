@@ -81,7 +81,7 @@ int test(char test_name[201], uint32_t pid)
 
     free(__environ);
 
-#ifdef CODE_COVERAGE_TEST
+#ifdef CODE_COVERAGE
     // Set __environ to NULL to avoid failing with code coverage test.
     __environ = NULL;
 #endif

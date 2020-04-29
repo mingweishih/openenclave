@@ -189,7 +189,7 @@ void test()
     oe_register_syscall_hook(_syscall_hook);
     TestAll();
 
-#ifdef CODE_COVERAGE_TEST // For code coverage tests.
+#ifdef CODE_COVERAGE // For code coverage tests.
     oe_register_syscall_hook(NULL);
 #endif
 }
