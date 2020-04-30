@@ -327,6 +327,8 @@ if (CODE_COVERAGE)
         COMPILE_FLAGS -fno-profile-arcs)
     set_source_files_properties(src/linux/reloc.c PROPERTIES
         COMPILE_FLAGS -fno-profile-arcs)
+
+    enclave_link_libraries(oecore PRIVATE gcov)
 endif()
 
 enclave_compile_definitions(oecore

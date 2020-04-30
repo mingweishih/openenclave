@@ -53,6 +53,8 @@ maybe_build_using_clangw(oesyscall)
 if (CODE_COVERAGE)
     # Enable code coverage.
     enclave_compile_options(oesyscall PRIVATE -g -O0 -fprofile-arcs -ftest-coverage)
+    # Link against libgcov.
+    enclave_link_libraries(oesyscall PRIVATE gcov)
 endif()
 
 add_enclave_dependencies(oesyscall syscall_trusted_edl)
@@ -62,7 +64,7 @@ enclave_include_directories(oesyscall PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}
     ${PROJECT_SOURCE_DIR}/include/openenclave/corelibc)
 
-enclave_link_libraries(oesyscall oecore)
+enclave_link_libraries(oesyscall PUBLIC oecore)
 
 set_source_files_properties(
     ${CMAKE_CURRENT_BINARY_DIR}/syscall_t.c

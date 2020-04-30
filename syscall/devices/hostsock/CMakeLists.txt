@@ -14,9 +14,11 @@ enclave_include_directories(oehostsock PRIVATE
 if (CODE_COVERAGE)
     # Enable code coverage.
     enclave_compile_options(oehostsock PRIVATE -g -O0 -fprofile-arcs -ftest-coverage)
+    # Link against libgcov.
+    enclave_link_libraries(oehostsock PRIVATE gcov)
 endif()
 
-enclave_link_libraries(oehostsock oesyscall)
+enclave_link_libraries(oehostsock PRIVATE oesyscall)
 
 install_enclaves(TARGETS oehostsock EXPORT openenclave-targets ARCHIVE
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/openenclave/enclave)

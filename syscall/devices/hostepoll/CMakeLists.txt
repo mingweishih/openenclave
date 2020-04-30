@@ -14,9 +14,11 @@ enclave_include_directories(oehostepoll PRIVATE
 if (CODE_COVERAGE)
     # Enable code coverage.
     enclave_compile_options(oehostepoll PRIVATE -g -O0 -fprofile-arcs -ftest-coverage)
+    # Link against libgcov.
+    enclave_link_libraries(oehostepoll PRIVATE gcov)
 endif()
 
-enclave_link_libraries(oehostepoll oesyscall)
+enclave_link_libraries(oehostepoll PRIVATE oesyscall)
 
 install_enclaves(TARGETS oehostepoll EXPORT openenclave-targets ARCHIVE
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/openenclave/enclave)

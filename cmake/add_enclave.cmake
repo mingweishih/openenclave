@@ -149,12 +149,6 @@ function(add_enclave_sgx)
     add_lvi_enclave_executable(${ENCLAVE_TARGET} ${ENCLAVE_SOURCES})
   endif ()
 
-  # Link against libgcov when enabling the code coverage test.
-  # Also, add the oehostfs that libgcov depends on.
-  if (CODE_COVERAGE_TEST)
-    enclave_link_libraries(${ENCLAVE_TARGET} gcov oehostfs)
-  endif()
-
   enclave_link_libraries(${ENCLAVE_TARGET} oeenclave)
   if (ENCLAVE_CXX)
     enclave_link_libraries(${ENCLAVE_TARGET} oelibcxx)

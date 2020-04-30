@@ -72,7 +72,7 @@ endmacro(enclave_include_directories)
 function(enclave_link_libraries NAME)
     # Handle each library separately.
     foreach(lib ${ARGN})
-        if (lib STREQUAL PUBLIC OR lib STREQUAL PRIVATE OR lib STREQUAL INTERFACE)
+        if ((lib STREQUAL PUBLIC) OR (lib STREQUAL PRIVATE) OR (lib STREQUAL INTERFACE))
             set(type "${lib}")
             continue()
         endif()

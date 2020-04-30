@@ -209,7 +209,7 @@ if (CODE_COVERAGE)
   add_custom_target(code_coverage
     COMMAND mkdir -p coverage
     COMMAND lcov -c -i -d ${CMAKE_BINARY_DIR} --gcov-tool ${OE_SCRIPTSDIR}/llvm-gcov -o coverage/base.info
-    #COMMAND ctest
+    COMMAND ctest
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
   set(FILTERED_LIST

@@ -11,7 +11,7 @@ maybe_build_using_clangw(gcov)
 
 enclave_compile_options(gcov PRIVATE -Wno-error)
 
-enclave_link_libraries(gcov PUBLIC oelibc)
+enclave_link_libraries(gcov PRIVATE oelibc oehostfs)
 
 enclave_include_directories(gcov PRIVATE src)
 

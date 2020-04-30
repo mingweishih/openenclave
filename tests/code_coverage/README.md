@@ -174,3 +174,12 @@ The HTML files will be saved into `/home/acc/openclave/build/coverage_report`. T
 ### Known issues
 - Smaller enclave heap size may cause the program to fail
 - The scheme is not thread-safe
+
+
+## Instruction
+
+### Prerequisite
+
+`sudo apt install python-pip`
+
+`pip install pycobertura`

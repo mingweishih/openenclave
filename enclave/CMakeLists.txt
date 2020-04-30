@@ -47,6 +47,8 @@ endif()
 if (CODE_COVERAGE)
     # Enable code coverage.
     enclave_compile_options(oeenclave PRIVATE -g -O0 -fprofile-arcs -ftest-coverage)
+    # Link against libgcov.
+    enclave_link_libraries(oeenclave PRIVATE gcov)
 endif()
 
 # Add location of the oeedger8r-generated trusted headers for internal
