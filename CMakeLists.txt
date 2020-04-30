@@ -228,12 +228,11 @@ if (CODE_COVERAGE)
   add_custom_command(TARGET code_coverage
     COMMAND lcov -d ${CMAKE_BINARY_DIR} --gcov-tool ${OE_SCRIPTSDIR}/code-coverage/llvm-gcov -c -o cov.info
     COMMAND lcov -a base.info -a cov.info -o cov_total.info
-    # Examples of filtering.
-    #COMMAND lcov --remove cov_total.info ${FILTERED_LIST} -o cov_filtered.info
+    COMMAND lcov --remove cov_total.info ${FILTERED_LIST} -o cov_filtered.info
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/coverage)
 
   add_custom_command(TARGET code_coverage
-    COMMAND ${OE_SCRIPTSDIR}/code-coverage/lcov_cobertura ${CMAKE_BINARY_DIR}/coverage/cov_total.info -o coverage.xml
+    COMMAND ${OE_SCRIPTSDIR}/code-coverage/lcov_cobertura ${CMAKE_BINARY_DIR}/coverage/cov_filtered.info -o coverage.xml
     COMMAND mv coverage.xml ${CMAKE_BINARY_DIR}/coverage
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 

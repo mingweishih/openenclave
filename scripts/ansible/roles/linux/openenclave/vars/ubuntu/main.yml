@@ -22,9 +22,11 @@ apt_packages:
   - "gcc"
   - "g++"
   - "gdb"
+  - "lcov"
   - "libssl-dev"
   - "openssl"
   - "pkg-config"
+  - "python-pip"
   - "apt-transport-https"
   - "autoconf"
   - "doxygen"
@@ -47,6 +49,9 @@ apt_arm_packages:
   - "libfdt1"
   - "openssh-client"
   - "sshpass"
+
+pip_packages:
+  - "lcov_cobertura"
 
 validation_distribution_binaries:
   - "/usr/bin/shellcheck"

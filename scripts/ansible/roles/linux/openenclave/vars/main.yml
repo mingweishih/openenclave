@@ -13,6 +13,7 @@ validation_binaries:
   - "{{ esy_bin_prefix }}/esy"
   - "/usr/bin/make"
   - "/usr/bin/dot"
+  - "/usr/bin/lcov"
   - "/usr/bin/gcc"
   - "/usr/bin/g++"
   - "/usr/bin/gdb"
@@ -22,4 +23,5 @@ validation_binaries:
   - "/usr/bin/openssl"
   - "/usr/bin/pkg-config"
   - "/usr/bin/git"
+  - "/usr/bin/pip"
   - "/usr/bin/svn"
