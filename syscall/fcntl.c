@@ -78,7 +78,7 @@ int oe_open_d(uint64_t devid, const char* pathname, int flags, oe_mode_t mode)
             OE_RAISE_ERRNO(OE_EINVAL);
 
         if (!(file = dev->ops.fs.open(dev, pathname, flags, mode)))
-            OE_RAISE_ERRNO_MSG(oe_errno, "pathname=%s mode=%u", pathname, mode);
+            goto done;
 
         if ((fd = oe_fdtable_assign(file)) == -1)
             OE_RAISE_ERRNO(oe_errno);
