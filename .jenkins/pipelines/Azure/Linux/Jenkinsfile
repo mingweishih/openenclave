@@ -19,7 +19,7 @@ AGENTS_LABELS = [
 
 
 def ACCTest(String label, String compiler, String build_type, String lvi_mitigation = 'None', String lvi_mitigation_skip_tests = 'OFF') {
-    /*stage("${label} ${compiler} SGX1FLC ${build_type} LVI_MITIGATION=${lvi_mitigation}") {
+    stage("${label} ${compiler} SGX1FLC ${build_type} LVI_MITIGATION=${lvi_mitigation}") {
         node("${label}") {
             timeout(GLOBAL_TIMEOUT_MINUTES) {
                 cleanWs()
@@ -43,14 +43,13 @@ def ACCTest(String label, String compiler, String build_type, String lvi_mitigat
                 oe.Run(compiler, task)
             }
         }
-    }*/
+    }
     stage("${label} ${compiler} SGX1FLC ${build_type} LVI_MITIGATION=${lvi_mitigation} Code Coverage") {
         node("${label}") {
-            //cobertura coberturaReportFile: 'build/coverage/coverage.xml'
-            cobertura coberturaReportFile: 'coverage.xml'
-            if (env.CHANGE_ID) {
-                publishCoverageGithub(filepath:'coverage.xml', coverageXmlType: 'cobertura', comparisonOption: [ value: 'optionFixedCoverage', fixedCoverage: '0.65' ], coverageRateType: 'Line')
-            }
+            cobertura coberturaReportFile: 'build/coverage/coverage.xml'
+            //if (env.CHANGE_ID) {
+                publishCoverageGithub(filepath:'build/coverage/coverage.xml', coverageXmlType: 'cobertura', comparisonOption: [ value: 'optionFixedCoverage', fixedCoverage: '0.65' ], coverageRateType: 'Line')
+            //}
         }
     }
 }
