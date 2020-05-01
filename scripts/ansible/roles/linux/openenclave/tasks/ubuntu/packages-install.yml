@@ -22,3 +22,7 @@
     state: latest
     update_cache: yes
     install_recommends: no
+
+- name: Install all the Open Enclave prerequisites Python packages for development
+  pip:
+    name: "{{ pip_packages }}"
