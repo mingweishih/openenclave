@@ -25,8 +25,8 @@ def ACCTest(String label, String compiler, String build_type, String lvi_mitigat
                 cleanWs()
                 checkout scm
                 def task = """
-                           apt install lcov                                             \
-                           pip3 install lcov_cobertura                                  \
+                           sudo apt install lcov
+                           sudo pip3 install lcov_cobertura
                            cmake ${WORKSPACE}                                           \
                                -G Ninja                                                 \
                                -DCODE_COVERAGE=ON                                       \
