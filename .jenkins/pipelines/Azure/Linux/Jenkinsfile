@@ -284,7 +284,7 @@ try{
       }
     } else {
         stage("PR Testing") {
-          parallel "ACC1804 clang-7 Debug LVI" :                              { ACCTest(AGENTS_LABELS["acc-ubuntu-18.04"], 'clang-7', 'Debug', 'ControlFlow', 'ON') }
+          parallel "ACC1804 clang-7 Debug Code Coverage" :                      { ACCTest(AGENTS_LABELS["acc-ubuntu-18.04"], 'clang-7', 'Debug') }
                    //"Host verification 1604 Release" :                         { ACCHostVerificationTest('16.04', 'Release') },
                    //"Host verification 1804 Release" :                         { ACCHostVerificationTest('18.04', 'Release') },
                    //"ACC1604 clang-7 Debug LVI" :                              { ACCTest(AGENTS_LABELS["acc-ubuntu-16.04"], 'clang-7', 'Debug', 'ControlFlow', 'ON') },
