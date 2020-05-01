@@ -226,9 +226,9 @@ if (CODE_COVERAGE)
       "'${CMAKE_BINARY_DIR}/3rdparty/*'")
 
   add_custom_command(TARGET code_coverage
-    COMMAND lcov -d ${CMAKE_BINARY_DIR} --gcov-tool ${OE_SCRIPTSDIR}/code-coverage/llvm-gcov -c -o cov.info
-    COMMAND lcov -a base.info -a cov.info -o cov_total.info
-    COMMAND lcov --remove cov_total.info ${FILTERED_LIST} -o cov_filtered.info
+    COMMAND lcov -d ${CMAKE_BINARY_DIR} --gcov-tool ${OE_SCRIPTSDIR}/code-coverage/llvm-gcov -c -o cov.info --rc lcov_branch_coverage=1
+    COMMAND lcov -a base.info -a cov.info -o cov_total.info --rc lcov_branch_coverage=1
+    COMMAND lcov --remove cov_total.info ${FILTERED_LIST} -o cov_filtered.info --rc lcov_branch_coverage=1
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/coverage)
 
   add_custom_command(TARGET code_coverage
