@@ -19,18 +19,13 @@ AGENTS_LABELS = [
 
 
 def ACCTest(String label, String compiler, String build_type, String lvi_mitigation = 'None', String lvi_mitigation_skip_tests = 'OFF') {
-    stage("${label} ${compiler} SGX1FLC ${build_type} LVI_MITIGATION=${lvi_mitigation} Code Coverage") {
-        node("${label}") {
-            cobertura coberturaReportFile: 'coverage.xml'
-        }
-    }
     stage("${label} ${compiler} SGX1FLC ${build_type} LVI_MITIGATION=${lvi_mitigation}") {
         node("${label}") {
             timeout(GLOBAL_TIMEOUT_MINUTES) {
                 cleanWs()
                 checkout scm
                 def task = """
-                           apt-get install lcov                                         \
+                           apt install lcov                                             \
                            pip3 install lcov_cobertura                                  \
                            cmake ${WORKSPACE}                                           \
                                -G Ninja                                                 \
@@ -46,6 +41,11 @@ def ACCTest(String label, String compiler, String build_type, String lvi_mitigat
                            """
                 oe.Run(compiler, task)
             }
+        }
+    }
+    stage("${label} ${compiler} SGX1FLC ${build_type} LVI_MITIGATION=${lvi_mitigation} Code Coverage") {
+        node("${label}") {
+            cobertura coberturaReportFile: 'build/coverage/coverage.xml'
         }
     }
 }
