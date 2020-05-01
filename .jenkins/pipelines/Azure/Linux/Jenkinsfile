@@ -30,6 +30,7 @@ def ACCTest(String label, String compiler, String build_type, String lvi_mitigat
                            cmake ${WORKSPACE}                                           \
                                -G Ninja                                                 \
                                -DCODE_COVERAGE=ON                                       \
+                               -DUSE_DEBUG_MALLOC=OFF                                   \
                                -DCMAKE_BUILD_TYPE=${build_type}                         \
                                -DLVI_MITIGATION=${lvi_mitigation}                       \
                                -DLVI_MITIGATION_BINDIR=/usr/local/lvi-mitigation/bin    \
