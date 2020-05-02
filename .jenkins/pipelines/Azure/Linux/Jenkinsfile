@@ -41,15 +41,12 @@ def ACCTest(String label, String compiler, String build_type, String lvi_mitigat
                            ninja code_coverage
                            """
                 oe.Run(compiler, task)
-            }
-        }
-    }
-    stage("${label} ${compiler} SGX1FLC ${build_type} LVI_MITIGATION=${lvi_mitigation} Code Coverage") {
-        node("${label}") {
-            cobertura coberturaReportFile: 'build/coverage/coverage.xml'
-            //if (env.CHANGE_ID) {
-            withEnv(["CHANGE_URL=https://github.com/mingweishih/openenclave/pull/3"]) {
-                publishCoverageGithub(filepath:'build/coverage/coverage.xml', coverageXmlType: 'cobertura', comparisonOption: [ value: 'optionFixedCoverage', fixedCoverage: '0.60' ], coverageRateType: 'Line')
+
+                cobertura coberturaReportFile: 'build/coverage/coverage.xml'
+                //if (env.CHANGE_ID) {
+                withEnv(["CHANGE_URL=https://github.com/mingweishih/openenclave/pull/3"]) {
+                    publishCoverageGithub(filepath:'build/coverage/coverage.xml', coverageXmlType: 'cobertura', comparisonOption: [ value: 'optionFixedCoverage', fixedCoverage: '0.60' ], coverageRateType: 'Line')
+                }
             }
         }
     }
