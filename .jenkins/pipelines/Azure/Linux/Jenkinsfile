@@ -44,7 +44,7 @@ def ACCTest(String label, String compiler, String build_type, String lvi_mitigat
 
                 cobertura coberturaReportFile: 'build/coverage/coverage.xml'
 
-                def pr_id = sh (script: "git log -1 | grep -Po 'Try #\K|Merge #\K)\d+'", returnStdout: true).trim()
+                def pr_id = sh (script: "git log -1 | grep -Po 'Try #\\K|Merge #\\K)\\d+'", returnStdout: true).trim()
                 echo "PR_ID: ${pr_id}"
                 echo "CHANGE_ID: ${env.CHANGE_ID}"
                 echo "BUILD_URL: ${env.BUILD_URL}"
