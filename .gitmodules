@@ -9,3 +9,7 @@
 [submodule "3rdparty/snmalloc"]
 	path = 3rdparty/snmalloc/snmalloc
 	url = https://github.com/Microsoft/snmalloc.git
+[submodule "3rdparty/libgcov/compiler-rt"]
+	path = 3rdparty/libgcov/compiler-rt
+	url = https://github.com/llvm-mirror/compiler-rt
+	branch = release_70
