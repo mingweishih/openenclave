@@ -22,7 +22,7 @@ if (COMPILE_SYSTEM_EDL)
 
   add_custom_target(core_trusted_edl DEPENDS core_t.h core_t.c core_args.h)
 
-  list(APPEND PLATFORM_SRC core_t_wrapper.c)
+  list(APPEND INTERNAL_EDL_SRC ${CMAKE_CURRENT_BINARY_DIR}/core_t.c)
 else ()
   add_custom_command(
     OUTPUT core_t.h core_args.h
@@ -50,7 +50,7 @@ if (OE_SGX AND COMPILE_SYSTEM_EDL)
   add_custom_target(platform_trusted_edl DEPENDS platform_t.h platform_t.c
                                                  platform_args.h)
 
-  list(APPEND PLATFORM_SRC sgx/platform_t_wrapper.c)
+  list(APPEND INTERNAL_EDL_SRC ${CMAKE_CURRENT_BINARY_DIR}/platform_t.c)
 elseif (OE_SGX)
   # Only generate headers
   add_custom_command(
@@ -70,6 +70,7 @@ endif ()
 
 set(MUSL_SRC_DIR ${PROJECT_SOURCE_DIR}/3rdparty/musl/musl/src)
 
+list(APPEND PLATFORM_SRC ${INTERNAL_EDL_SRC})
 if (OE_SGX)
   list(
     APPEND
@@ -246,6 +247,10 @@ endif ()
 if (CMAKE_C_COMPILER_ID MATCHES GNU)
   enclave_compile_options(oecore PRIVATE -Wjump-misses-init)
 endif ()
+
+# Add the definition of INTERNAL_EDL to the sources generated from internal EDLs.
+set_property(SOURCE ${INTERNAL_EDL_SRC} APPEND PROPERTY COMPILE_DEFINITIONS
+                                                        OE_INTERNAL_EDL)
 
 # NOTE: All code inside an enclave must be compile with "position
 # independent executable" semantics via -fPIE, and linked with -pie.

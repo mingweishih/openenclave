@@ -4,6 +4,7 @@
 open Intel.Ast
 open Common
 open Printf
+open Crc32
 
 (** Given [name], return the corresponding [StructDef], or [None]. *)
 let get_struct_by_name (cts : composite_type list) (name : string) =
@@ -661,20 +662,30 @@ let get_ecall_function get_deepcopy (tf : trusted_func) =
 (** Generate enclave OCALL wrapper function. *)
 let get_ocall_function_wrapper get_deepcopy enclave_name (uf : untrusted_func) =
   let fd = uf.uf_fdecl in
-  let allocate_buffer, call_function, free_buffer =
+  let is_switchless =
+    if uf.uf_is_switchless then [ "const bool is_switchless = true;"]
+    else [ "const bool is_switchless = false;" ]
+  in
+  let allocate_buffer, free_buffer =
     if uf.uf_is_switchless then
       ( "oe_allocate_switchless_ocall_buffer",
-        "oe_switchless_call_host_function",
         "oe_free_switchless_ocall_buffer" )
     else
       ( "oe_allocate_ocall_buffer",
-        "oe_call_host_function",
         "oe_free_ocall_buffer" )
   in
   [
     get_wrapper_prototype fd false;
     "{";
     "    oe_result_t _result = OE_FAILURE;";
+    "";
+    sprintf "    /* CRC32 of %s */" fd.fname;
+    sprintf "    const uint64_t _function_hash = %d;" (crc32 fd.fname);
+    "";
+    "    /* Used to cache the ocall id. */";
+    "    static uint64_t _ocall_id = OE_OCALL_ID_NULL;";
+    "";
+    String.concat "\n    " is_switchless;
     "";
     "    /* If the enclave is in crashing/crashed status, new OCALL should fail";
     "       immediately. */";
@@ -705,16 +716,18 @@ let get_ocall_function_wrapper get_deepcopy enclave_name (uf : untrusted_func) =
     ^ String.concat "\n    " (get_input_buffer get_deepcopy fd allocate_buffer);
     "";
     "    /* Call host function. */";
-    "    if ((_result = " ^ call_function ^ "(";
+    "    if ((_result = oe_call_host_function(";
     "             "
     ^ String.concat ",\n             "
         [
-          get_function_id enclave_name fd;
+          "&_ocall_id";
+          "_function_hash";
           "_input_buffer";
           "_input_buffer_size";
           "_output_buffer";
           "_output_buffer_size";
-          "&_output_bytes_written)) != OE_OK)";
+          "&_output_bytes_written";
+          "is_switchless)) != OE_OK)";
         ];
     "        goto done;";
     "";
@@ -743,18 +756,32 @@ let generate_trusted (ec : enclave_content) (ep : Intel.Util.edger8r_params) =
     else [ "/* There were no ecalls. */" ]
   in
   let ecall_table =
-    let table = "__oe_ecalls_table" in
+    let table = "__oe_ecall_table" in
+    let register_function = "oe_register_" ^ ec.enclave_name ^ "_enclave_functions" in
     if tfs <> [] then
       [
-        sprintf "oe_ecall_func_t %s[] = {" table;
+        sprintf "static oe_ecall_struct_t %s[] = {" table;
         "    "
         ^ String.concat ",\n    "
             (List.map
-               (fun f -> "(oe_ecall_func_t) ecall_" ^ f.tf_fdecl.fname)
+               (fun f ->
+                 sprintf "{ (oe_ecall_func_t) ecall_%s, %d }"
+                   f.tf_fdecl.fname
+                   (crc32 f.tf_fdecl.fname))
                tfs);
         "};";
+        sprintf "static uint32_t %s_size = %d;" table (List.length tfs);
         "";
-        sprintf "size_t %s_size = OE_COUNTOF(%s);" table table;
+        "/* Ecall table registration function. */";
+        sprintf "void %s(void)" register_function;
+        "{";
+        "    oe_register_enclave_functions_internal(";
+        sprintf "        %s," table;
+        sprintf "        %s_size);" table;
+        "}";
+        "#ifndef OE_INTERNAL_EDL";
+        sprintf "EDGER8R_WEAK_ALIAS(%s, oe_register_enclave_functions);" register_function;
+        "#endif";
       ]
     else [ "/* There were no ecalls. */" ]
   in
@@ -796,6 +823,12 @@ let get_host_ecall_wrapper get_deepcopy enclave_name (tf : trusted_func) =
     "{";
     "    oe_result_t _result = OE_FAILURE;";
     "";
+    sprintf "    /* CRC32 of %s */" fd.fname;
+    sprintf "    const uint64_t _function_hash = %d;" (crc32 fd.fname);
+    "";
+    "    /* Used to cache the id in the ecall id caching table. */";
+    "    static uint64_t _global_ecall_id = OE_GLOBAL_ECALL_ID_NULL;";
+    "";
     "    /* Marshalling struct. */";
     sprintf "    %s_args_t _args, *_pargs_in = NULL, *_pargs_out = NULL;"
       fd.fname;
@@ -823,10 +856,11 @@ let get_host_ecall_wrapper get_deepcopy enclave_name (tf : trusted_func) =
     "    /* Call enclave function. */";
     "    if ((_result = " ^ ecall_function ^ "(";
     "             "
-    ^ String.concat ",\n             "
+    ^ String.concat ",\n            "
         [
           "enclave";
-          get_function_id enclave_name fd;
+          "&_global_ecall_id";
+          "_function_hash";
           "_input_buffer";
           "_input_buffer_size";
           "_output_buffer";
@@ -911,29 +945,81 @@ let get_ocall_function get_deepcopy (uf : untrusted_func) =
 
 let generate_untrusted (ec : enclave_content) (ep : Intel.Util.edger8r_params) =
   let get_deepcopy = get_deepcopy_function ep.experimental ec.comp_defs in
+  let tfs = ec.tfunc_decls in
   let host_ecall_wrappers =
-    let tfs = ec.tfunc_decls in
     if tfs <> [] then
       flatten_map (get_host_ecall_wrapper get_deepcopy ec.enclave_name) tfs
     else [ "/* There were no ecalls. */" ]
   in
+  let register_ecalls_function = "oe_host_register_" ^ ec.enclave_name ^ "_enclave_functions" in
+  let ecall_registration =
+    if tfs <> [] then
+      [
+        "static uint64_t __oe_ecall_hash_table[] = {";
+        "    "
+        ^ String.concat ",\n    "
+         (List.map
+             (fun f ->
+               sprintf "%d /* CRC32 of %s. */"
+                 (crc32 f.tf_fdecl.fname)
+                 f.tf_fdecl.fname)
+             tfs);
+        "};";
+        "";
+        sprintf "static uint32_t __oe_ecall_hash_table_size = %d;" (List.length tfs);
+        "";
+        "/* Ecall table registration function. */";
+        sprintf "void %s(oe_enclave_t* enclave)" register_ecalls_function;
+        "{";
+        "    oe_host_register_enclave_functions(";
+        "        enclave,";
+        "        __oe_ecall_hash_table,";
+        "        __oe_ecall_hash_table_size);";
+        "}";
+      ]
+    else
+      [
+        "static uint64_t* __oe_ecall_hash_table = NULL;";
+        "static uint32_t __oe_ecall_hash_table_size = 0;";
+      ]
+  in
+  let ufs = ec.ufunc_decls in
   let ocall_functions =
-    let ufs = ec.ufunc_decls in
     if ufs <> [] then flatten_map (get_ocall_function get_deepcopy) ufs
     else [ "/* There were no ocalls. */" ]
   in
   let ocall_table =
-    [
-      sprintf "static oe_ocall_func_t __%s_ocall_function_table[] = {"
-        ec.enclave_name;
-      "    "
-      ^ String.concat "\n    "
+    let table = "__oe_ocall_table" in
+    let register_function = "oe_register_" ^ ec.enclave_name ^ "_host_functions" in
+    if ufs <> [] then
+      [
+        sprintf "static oe_ocall_struct_t %s[] = {" table;
+        "    "
+        ^ String.concat ",\n    "
           (List.map
-             (fun f -> "(oe_ocall_func_t) ocall_" ^ f.uf_fdecl.fname ^ ",")
-             ec.ufunc_decls);
-      "    NULL";
-      "};";
-    ]
+             (fun f ->
+               sprintf "{ (oe_ocall_func_t) ocall_%s, %d }"
+                 f.uf_fdecl.fname
+                 (crc32 f.uf_fdecl.fname))
+             ufs);
+        "};";
+        "";
+        sprintf "static uint32_t %s_size = %d;" table (List.length ufs);
+        "";
+        "/* Ocall functions registration function. */";
+        sprintf "void %s(void)" register_function;
+        "{";
+        "    oe_register_host_functions(";
+        sprintf "        %s," table;
+        sprintf "        %s_size);" table;
+        "}";
+      ]
+    else
+      [
+        "/* There were no ocalls. */";
+        "static oe_ocall_struct_t* __oe_ocall_table = NULL;";
+        "static uint32_t __oe_ocall_table_size = 0;";
+      ]
   in
   [
     sprintf "#include \"%s_u.h\"" ec.file_shortnm;
@@ -945,6 +1031,8 @@ let generate_untrusted (ec : enclave_content) (ep : Intel.Util.edger8r_params) =
     "/**** ECALL function wrappers. ****/";
     "";
     String.concat "\n" host_ecall_wrappers;
+    String.concat "\n" ecall_registration;
+    "";
     "/**** OCALL functions. ****/";
     "";
     String.concat "\n" ocall_functions;
@@ -966,8 +1054,10 @@ let generate_untrusted (ec : enclave_content) (ep : Intel.Util.edger8r_params) =
     "               flags,";
     "               settings,";
     "               setting_count,";
-    sprintf "               __%s_ocall_function_table," ec.enclave_name;
-    sprintf "               %d," (List.length ec.ufunc_decls);
+    "               __oe_ocall_table,";
+    "               __oe_ocall_table_size,";
+    "               __oe_ecall_hash_table,";
+    "               __oe_ecall_hash_table_size,";
     "               enclave);";
     "}";
     "";

@@ -30,7 +30,7 @@ if (OCAMLOPT)
     # be selected if the type becomes unknown.
     COMMAND
       ocamlopt -bin-annot str.cmxa unix.cmxa Intel.cmx -w -3-40 Common.mli
-      Common.ml Headers.mli Headers.ml Sources.mli Sources.ml Emitter.ml main.ml
+      Common.ml Headers.mli Headers.ml Crc32.mli Crc32.ml Sources.mli Sources.ml Emitter.ml main.ml
       -o ${BINARY}
     DEPENDS src/dune
             src/Common.mli

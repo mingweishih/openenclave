@@ -55,14 +55,17 @@ static char* get_fullpath(const char* path)
 #include <string.h>
 #include "../memalign.h"
 #include "../signkey.h"
+#include "core_u.h"
 #include "cpuid.h"
 #include "enclave.h"
 #include "exception.h"
 #include "platform_u.h"
 #include "sgxload.h"
+#include "syscall_u.h"
 
 #if !defined(OEHOSTMR)
 static oe_once_type _enclave_init_once;
+static oe_once_type _enclave_ecall_register_once;
 
 static void _initialize_exception_handling(void)
 {
@@ -77,14 +80,33 @@ static void _initialize_exception_handling(void)
 **==============================================================================
 */
 
-static void _initialize_enclave_host()
+static void _initialize_enclave_host(
+    const oe_ocall_struct_t* ocall_table,
+    uint32_t ocall_count)
 {
     oe_once(&_enclave_init_once, _initialize_exception_handling);
 
+    oe_register_host_functions(ocall_table, ocall_count);
 #ifdef OE_USE_BUILTIN_EDL
-    oe_register_core_ocall_function_table();
-    oe_register_platform_ocall_function_table();
-    oe_register_syscall_ocall_function_table();
+    oe_register_core_host_functions();
+    oe_register_platform_host_functions();
+    oe_register_syscall_host_functions();
+#endif // OE_USE_BUILTIN_EDL
+}
+
+static void _register_enclave_functions(
+    oe_enclave_t* enclave,
+    const uint64_t* ecall_hash_table,
+    uint32_t ecall_hash_count)
+{
+    oe_once(&_enclave_ecall_register_once, _initialize_exception_handling);
+
+    oe_host_register_enclave_functions(
+        enclave, ecall_hash_table, ecall_hash_count);
+#ifdef OE_USE_BUILTIN_EDL
+    oe_host_register_core_enclave_functions(enclave);
+    oe_host_register_platform_enclave_functions(enclave);
+    oe_host_register_syscall_enclave_functions(enclave);
 #endif // OE_USE_BUILTIN_EDL
 }
 #endif // OEHOSTMR
@@ -883,15 +905,17 @@ oe_result_t oe_create_enclave(
     uint32_t flags,
     const oe_enclave_setting_t* settings,
     uint32_t setting_count,
-    const oe_ocall_func_t* ocall_table,
+    const oe_ocall_struct_t* ocall_table,
     uint32_t ocall_count,
+    const uint64_t* ecall_hash_table,
+    uint32_t ecall_hash_count,
     oe_enclave_t** enclave_out)
 {
     oe_result_t result = OE_UNEXPECTED;
     oe_enclave_t* enclave = NULL;
     oe_sgx_load_context_t context;
 
-    _initialize_enclave_host();
+    _initialize_enclave_host(ocall_table, ocall_count);
 
 #if _WIN32
     if (flags & OE_ENCLAVE_FLAG_SIMULATE)
@@ -995,11 +1019,6 @@ oe_result_t oe_create_enclave(
         oe_debug_notify_enclave_created(debug_enclave);
     }
 
-    /* Enclave initialization invokes global constructors which could make
-     * ocalls. Therefore setup ocall table prior to initialization. */
-    enclave->ocalls = (const oe_ocall_func_t*)ocall_table;
-    enclave->num_ocalls = ocall_count;
-
     /* Invoke enclave initialization. */
     OE_CHECK(_initialize_enclave(enclave));
 
@@ -1008,6 +1027,12 @@ oe_result_t oe_create_enclave(
 
     /* Setup logging configuration */
     oe_log_enclave_init(enclave);
+
+    /*
+     * Register eclave functions to set up the function id caching table.
+     * Note that this operations require the enclave struct to be initialized.
+     */
+    _register_enclave_functions(enclave, ecall_hash_table, ecall_hash_count);
 
     *enclave_out = enclave;
     result = OE_OK;

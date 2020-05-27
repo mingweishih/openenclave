@@ -221,8 +221,10 @@ oe_result_t oe_handle_call_host_function(uint64_t arg, oe_enclave_t* enclave)
     oe_result_t result = OE_OK;
     oe_ocall_func_t func = NULL;
     size_t buffer_size = 0;
-    ocall_table_t ocall_table;
 
+    OE_UNUSED(enclave);
+
+    printf("[oe_handle_call_host_function]\n");
     args_ptr = (oe_call_host_function_args_t*)arg;
     if (args_ptr == NULL)
         OE_RAISE(OE_INVALID_PARAMETER);
@@ -231,29 +233,18 @@ oe_result_t oe_handle_call_host_function(uint64_t arg, oe_enclave_t* enclave)
     if (args_ptr->input_buffer == NULL || args_ptr->output_buffer == NULL)
         OE_RAISE(OE_INVALID_PARAMETER);
 
-    // Resolve which ocall table to use.
-    if (args_ptr->table_id == OE_UINT64_MAX)
-    {
-        ocall_table.ocalls = enclave->ocalls;
-        ocall_table.num_ocalls = enclave->num_ocalls;
-    }
-    else
-    {
-        if (args_ptr->table_id >= OE_MAX_OCALL_TABLES)
-            OE_RAISE(OE_NOT_FOUND);
+    // Validate the function id.
+    OE_CHECK(oe_is_host_function_id_valid(args_ptr->function_id));
 
-        ocall_table.ocalls = _ocall_tables[args_ptr->table_id].ocalls;
-        ocall_table.num_ocalls = _ocall_tables[args_ptr->table_id].num_ocalls;
+    // Validate the function hash.
+    printf(
+        "[oe_handle_call_host_function] target hash: %lu, expected hash: %lu\n",
+        args_ptr->function_hash,
+        _ocall_table[args_ptr->function_id].hash);
+    if (args_ptr->function_hash != _ocall_table[args_ptr->function_id].hash)
+        OE_RAISE(OE_FAILURE);
 
-        if (!ocall_table.ocalls)
-            OE_RAISE(OE_NOT_FOUND);
-    }
-
-    // Fetch matching function.
-    if (args_ptr->function_id >= ocall_table.num_ocalls)
-        OE_RAISE(OE_NOT_FOUND);
-
-    func = ocall_table.ocalls[args_ptr->function_id];
+    func = _ocall_table[args_ptr->function_id].ocall;
     if (func == NULL)
     {
         result = OE_NOT_FOUND;
@@ -299,7 +290,8 @@ static const char* oe_ocall_str(oe_func_t ocall)
         "THREAD_WAIT",
         "MALLOC",
         "FREE",
-        "GET_TIME"
+        "GET_TIME",
+        "GET_FUNCTION_ID_BY_HASH"
     };
     // clang-format on
 
@@ -319,7 +311,8 @@ static const char* oe_ecall_str(oe_func_t ecall)
         "DESTRUCTOR",
         "INIT_ENCLAVE",
         "CALL_ENCLAVE_FUNCTION",
-        "VIRTUAL_EXCEPTION_HANDLER"
+        "VIRTUAL_EXCEPTION_HANDLER",
+        "GET_FUNCTION_ID_BY_HASH"
     };
     // clang-format on
 
@@ -388,6 +381,10 @@ static oe_result_t _handle_ocall(
 
         case OE_OCALL_GET_TIME:
             oe_handle_get_time(arg_in, arg_out);
+            break;
+
+        case OE_OCALL_GET_FUNCTION_ID_BY_HASH:
+            oe_get_function_id_by_hash(arg_in, arg_out);
             break;
 
         default:
@@ -655,5 +652,118 @@ done:
     /* ATTN: the SetEnclave() function no longer exists */
     /* SetEnclave(NULL); */
 
+    return result;
+}
+
+// Get the global ecall id from the per-enclave table.
+oe_result_t oe_get_global_enclave_function_id_by_hash(
+    oe_enclave_t* enclave,
+    uint64_t hash,
+    uint64_t* global_id)
+{
+    oe_result_t result = OE_OK;
+    size_t i;
+
+    // The check may be redundant.
+    if (!enclave || !global_id)
+        OE_RAISE(OE_INVALID_PARAMETER);
+
+    for (i = 0; i < enclave->ecall_id_table_size; i++)
+    {
+        if (enclave->ecall_id_table[i].hash == hash)
+        {
+            *global_id = i;
+            goto done;
+        }
+    }
+
+    result = OE_NOT_FOUND;
+done:
+    return result;
+}
+
+oe_result_t oe_get_enclave_function_id(
+    oe_enclave_t* enclave,
+    uint64_t global_id,
+    uint64_t* id)
+{
+    oe_result_t result = OE_FAILURE;
+
+    if (!enclave || global_id >= enclave->ecall_id_table_size || !id)
+        OE_RAISE(OE_INVALID_PARAMETER);
+
+    *id = enclave->ecall_id_table[global_id].id;
+
+    result = OE_OK;
+done:
+    return result;
+}
+
+oe_result_t oe_set_enclave_function_id(
+    oe_enclave_t* enclave,
+    uint64_t global_id,
+    uint64_t id)
+{
+    oe_result_t result = OE_FAILURE;
+
+    if (!enclave || global_id >= enclave->ecall_id_table_size ||
+        id == OE_ECALL_ID_NULL)
+        OE_RAISE(OE_INVALID_PARAMETER);
+
+    // Each entry can only be set once.
+    if (enclave->ecall_id_table[global_id].id != OE_ECALL_ID_NULL)
+        OE_RAISE(OE_UNEXPECTED);
+
+    enclave->ecall_id_table[global_id].id = id;
+
+    result = OE_OK;
+done:
+    return result;
+}
+
+static oe_mutex _ecall_hash_table_lock = OE_H_MUTEX_INITIALIZER;
+oe_result_t oe_host_register_enclave_functions(
+    oe_enclave_t* enclave,
+    const uint64_t* ecall_hash_table,
+    uint32_t num_ecalls)
+{
+    oe_result_t result = OE_UNEXPECTED;
+
+    printf("[oe_host_register_ecall_function\n]");
+    if (!enclave)
+        OE_RAISE(OE_INVALID_PARAMETER);
+
+    /*  Nothing to add when the table is empty, fall through. */
+    if (!ecall_hash_table || !num_ecalls)
+    {
+        result = OE_OK;
+        goto done;
+    }
+
+    oe_mutex_lock(&_ecall_hash_table_lock);
+    uint32_t* size_ptr = &enclave->ecall_id_table_size;
+    uint32_t i;
+    for (i = 0; i < num_ecalls; i++)
+    {
+        uint64_t global_id;
+        uint64_t hash = ecall_hash_table[i];
+        printf("[register_ecall_functions] %u: hash - %lu\n", i, hash);
+        // Avoid register dubplicated functions.
+        if (oe_get_global_enclave_function_id_by_hash(
+                enclave, hash, &global_id) != OE_NOT_FOUND)
+            continue;
+
+        if (*size_ptr >= 256)
+            OE_RAISE(OE_OUT_OF_BOUNDS);
+        enclave->ecall_id_table[*size_ptr].id = OE_ECALL_ID_NULL;
+        enclave->ecall_id_table[*size_ptr].hash = hash;
+        printf("Registered at ecall_id_table: %u\n", *size_ptr);
+        (*size_ptr)++;
+    }
+    oe_mutex_unlock(&_ecall_hash_table_lock);
+
+    result = OE_OK;
+
+done:
     return result;
 }

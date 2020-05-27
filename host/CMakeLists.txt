@@ -22,7 +22,7 @@ if (COMPILE_SYSTEM_EDL)
 
   add_custom_target(core_untrusted_edl DEPENDS core_u.h core_u.c core_args.h)
 
-  list(APPEND PLATFORM_SDK_ONLY_SRC core_u_wrapper.c)
+  list(APPEND INTERNAL_EDL_SRC ${CMAKE_CURRENT_BINARY_DIR}/core_u.c)
 else ()
   # Only generate headers
   add_custom_command(
@@ -105,7 +105,7 @@ if (OE_SGX AND COMPILE_SYSTEM_EDL)
   add_custom_target(platform_untrusted_edl DEPENDS platform_u.h platform_u.c
                                                    platform_args.h)
 
-  list(APPEND PLATFORM_SDK_ONLY_SRC sgx/platform_u_wrapper.c)
+  list(APPEND INTERNAL_EDL_SRC ${CMAKE_CURRENT_BINARY_DIR}/platform_u.c)
 elseif (OE_SGX)
   add_custom_command(
     OUTPUT platform_u.h platform_args.h
@@ -133,7 +133,7 @@ if (COMPILE_SYSTEM_EDL)
   add_custom_target(syscall_untrusted_edl DEPENDS syscall_u.h syscall_u.c
                                                   syscall_args.h)
 
-  list(APPEND PLATFORM_SDK_ONLY_SRC syscall_u_wrapper.c)
+  list(APPEND INTERNAL_EDL_SRC ${CMAKE_CURRENT_BINARY_DIR}/syscall_u.c)
 else ()
   add_custom_command(
     OUTPUT syscall_u.h syscall_args.h
@@ -158,6 +158,8 @@ install(DIRECTORY ../edl/
 ## these rules build the oehost target.
 ##
 ##==============================================================================
+
+list(APPEND PLATFORM_SDK_ONLY_SRC ${INTERNAL_EDL_SRC})
 
 # OS specific but arch agnostic files.
 if (UNIX)
@@ -556,6 +558,12 @@ endif ()
 if (CMAKE_C_COMPILER_ID MATCHES GNU)
   target_compile_options(oehost PRIVATE -Wjump-misses-init)
 endif ()
+
+# Add the definition of INTERNAL_EDL to the sources generated from internal EDLs.
+set_property(
+  SOURCE ${INTERNAL_EDL_SRC}
+  APPEND
+  PROPERTY COMPILE_DEFINITIONS OE_INTERNAL_EDL)
 
 # Use the same the compile options and definitions from oehost.
 target_compile_options(

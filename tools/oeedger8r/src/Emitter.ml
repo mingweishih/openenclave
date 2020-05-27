@@ -191,6 +191,7 @@ let write_enclave_code (ec : enclave_content) (ep : Intel.Util.edger8r_params) =
 
 (** Install the plugin. *)
 let _ =
+  Random.self_init();
   Printf.printf "Generating edge routines for the Open Enclave SDK.\n";
   Intel.Plugin.instance.available <- true;
   Intel.Plugin.instance.gen_edge_routines <- write_enclave_code

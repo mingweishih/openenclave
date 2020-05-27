@@ -167,6 +167,8 @@ static oe_result_t _eeid_patch_memory_sizes()
 }
 #endif
 
+extern void oe_register_enclave_functions(void);
+
 /*
 **==============================================================================
 **
@@ -199,13 +201,12 @@ static oe_result_t _handle_init_enclave(uint64_t arg_in)
             OE_CHECK(_eeid_patch_memory_sizes());
 #endif
 
+            oe_register_enclave_functions();
 #ifdef OE_USE_BUILTIN_EDL
-            /* Install the common TEE ECALL function table. */
-            OE_CHECK(oe_register_core_ecall_function_table());
+            oe_register_core_enclave_functions();
 
-            /* Install the SGX ECALL function table. */
-            OE_CHECK(oe_register_platform_ecall_function_table());
-#endif // OE_USE_BUILTIN_EDL
+            oe_register_platform_enclave_functions();
+#endif
 
             if (!oe_is_outside_enclave(enclave, 1))
                 OE_RAISE(OE_INVALID_PARAMETER);
@@ -248,7 +249,6 @@ oe_result_t oe_handle_call_enclave_function(uint64_t arg_in)
     uint8_t* output_buffer = NULL;
     size_t buffer_size = 0;
     size_t output_bytes_written = 0;
-    ecall_table_t ecall_table;
 
     // Ensure that args lies outside the enclave.
     if (!oe_is_outside_enclave(
@@ -284,29 +284,14 @@ oe_result_t oe_handle_call_enclave_function(uint64_t arg_in)
     OE_CHECK(oe_safe_add_u64(
         args.input_buffer_size, args.output_buffer_size, &buffer_size));
 
-    // Resolve which ecall table to use.
-    if (args_ptr->table_id == OE_UINT64_MAX)
-    {
-        ecall_table.ecalls = __oe_ecalls_table;
-        ecall_table.num_ecalls = __oe_ecalls_table_size;
-    }
-    else
-    {
-        if (args_ptr->table_id >= OE_MAX_ECALL_TABLES)
-            OE_RAISE(OE_NOT_FOUND);
+    // Validate the function id.
+    OE_CHECK(oe_is_enclave_function_id_valid(args_ptr->function_id));
 
-        ecall_table.ecalls = _ecall_tables[args_ptr->table_id].ecalls;
-        ecall_table.num_ecalls = _ecall_tables[args_ptr->table_id].num_ecalls;
+    // Validate the function hash.
+    if (args_ptr->function_hash != _ecall_table[args_ptr->function_id].hash)
+        OE_RAISE(OE_FAILURE);
 
-        if (!ecall_table.ecalls)
-            OE_RAISE(OE_NOT_FOUND);
-    }
-
-    // Fetch matching function.
-    if (args.function_id >= ecall_table.num_ecalls)
-        OE_RAISE(OE_NOT_FOUND);
-
-    func = ecall_table.ecalls[args.function_id];
+    func = _ecall_table[args_ptr->function_id].ecall;
 
     if (func == NULL)
         OE_RAISE(OE_NOT_FOUND);
@@ -486,6 +471,11 @@ static void _handle_ecall(
         case OE_ECALL_INIT_ENCLAVE:
         {
             arg_out = _handle_init_enclave(arg_in);
+            break;
+        }
+        case OE_ECALL_GET_FUNCTION_ID_BY_HASH:
+        {
+            arg_out = oe_get_enclave_function_id_by_hash(arg_in);
             break;
         }
         default:
@@ -729,14 +719,15 @@ done:
 /*
 **==============================================================================
 **
-** oe_call_host_function_by_table_id()
+** oe_call_host_function()
+** This is the preferred way to call host functions.
 **
 **==============================================================================
 */
 
-oe_result_t oe_call_host_function_by_table_id(
-    uint64_t table_id,
-    uint64_t function_id,
+oe_result_t oe_call_host_function(
+    uint64_t* function_id,
+    uint64_t function_hash,
     const void* input_buffer,
     size_t input_buffer_size,
     void* output_buffer,
@@ -746,10 +737,26 @@ oe_result_t oe_call_host_function_by_table_id(
 {
     oe_result_t result = OE_UNEXPECTED;
     oe_call_host_function_args_t* args = NULL;
+    uint64_t _function_id = OE_OCALL_ID_NULL;
+    static oe_spinlock_t _lock = OE_SPINLOCK_INITIALIZER;
 
     /* Reject invalid parameters */
-    if (!input_buffer || input_buffer_size == 0)
+    if (!function_id || !input_buffer || input_buffer_size == 0)
         OE_RAISE(OE_INVALID_PARAMETER);
+
+    /*
+     * Check if the OCALL id is set. If not, making a special OCALL to query the
+     * id by hash. Note that after the first OCALL, the id will be cached. Since
+     * the id is a static variable, using lock around its memory accesses.
+     */
+    oe_spin_lock(&_lock);
+    _function_id = *function_id;
+    if (_function_id == OE_OCALL_ID_NULL)
+    {
+        _function_id = oe_host_get_ocall_id_by_hash(function_hash);
+        *function_id = _function_id;
+    }
+    oe_spin_unlock(&_lock);
 
     /*
      * oe_post_switchless_ocall (below) can make a regular ocall to wake up the
@@ -767,8 +774,8 @@ oe_result_t oe_call_host_function_by_table_id(
         OE_RAISE(OE_UNEXPECTED);
     }
 
-    args->table_id = table_id;
-    args->function_id = function_id;
+    args->function_id = _function_id;
+    args->function_hash = function_hash;
     args->input_buffer = input_buffer;
     args->input_buffer_size = input_buffer_size;
     args->output_buffer = output_buffer;
@@ -814,34 +821,6 @@ oe_result_t oe_call_host_function_by_table_id(
 done:
 
     return result;
-}
-
-/*
-**==============================================================================
-**
-** oe_call_host_function()
-** This is the preferred way to call host functions.
-**
-**==============================================================================
-*/
-
-oe_result_t oe_call_host_function(
-    size_t function_id,
-    const void* input_buffer,
-    size_t input_buffer_size,
-    void* output_buffer,
-    size_t output_buffer_size,
-    size_t* output_bytes_written)
-{
-    return oe_call_host_function_by_table_id(
-        OE_UINT64_MAX,
-        function_id,
-        input_buffer,
-        input_buffer_size,
-        output_buffer,
-        output_buffer_size,
-        output_bytes_written,
-        false /* non-switchless */);
 }
 
 /*

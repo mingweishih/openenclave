@@ -182,33 +182,6 @@ oe_result_t oe_post_switchless_ocall(oe_call_host_function_args_t* args)
     return result;
 }
 
-/*
-**==============================================================================
-**
-** oe_switchless_call_host_function()
-**
-**==============================================================================
-*/
-
-oe_result_t oe_switchless_call_host_function(
-    size_t function_id,
-    const void* input_buffer,
-    size_t input_buffer_size,
-    void* output_buffer,
-    size_t output_buffer_size,
-    size_t* output_bytes_written)
-{
-    return oe_call_host_function_by_table_id(
-        OE_UINT64_MAX,
-        function_id,
-        input_buffer,
-        input_buffer_size,
-        output_buffer,
-        output_buffer_size,
-        output_bytes_written,
-        true /* switchless */);
-}
-
 void oe_sgx_switchless_enclave_worker_thread_ecall(
     oe_enclave_worker_context_t* context)
 {

@@ -86,6 +86,22 @@ typedef void (*oe_ocall_func_t)(
     size_t* output_bytes_written);
 
 /**
+ * A struct that holds both the function pointer
+ * of an ocall and the hash of its name.
+ */
+typedef struct _oe_ocall_struct_t
+{
+    oe_ocall_func_t ocall;
+    uint64_t hash;
+} oe_ocall_struct_t;
+
+typedef struct _oe_ecall_id_t
+{
+    uint64_t id;
+    uint64_t hash;
+} oe_ecall_id_t;
+
+/**
  * Types of settings passed into **oe_create_enclave**
  */
 typedef enum _oe_enclave_setting_type
@@ -178,8 +194,10 @@ oe_result_t oe_create_enclave(
     uint32_t flags,
     const oe_enclave_setting_t* settings,
     uint32_t setting_count,
-    const oe_ocall_func_t* ocall_table,
+    const oe_ocall_struct_t* ocall_table,
     uint32_t ocall_count,
+    const uint64_t* ecall_hash_table,
+    uint32_t ecall_hash_count,
     oe_enclave_t** enclave);
 
 /**

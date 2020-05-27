@@ -64,19 +64,32 @@ OE_EXTERNC_BEGIN
  */
 oe_result_t oe_call_enclave_function(
     oe_enclave_t* enclave,
-    uint32_t function_id,
+    uint64_t* host_caching_id,
+    uint64_t function_hash,
     const void* input_buffer,
     size_t input_buffer_size,
     void* output_buffer,
     size_t output_buffer_size,
     size_t* output_bytes_written);
 
+oe_result_t oe_register_host_functions(
+    const oe_ocall_struct_t* ocall_table,
+    uint32_t num_ocalls);
+
+#define OE_GLOBAL_ECALL_ID_NULL OE_UINT64_MAX
+
+oe_result_t oe_host_register_enclave_functions(
+    oe_enclave_t* enclave,
+    const uint64_t* ecall_hash_table,
+    uint32_t num_ecalls);
+
 /**
  * Placeholder.
  */
 oe_result_t oe_switchless_call_enclave_function(
     oe_enclave_t* enclave,
-    uint32_t function_id,
+    uint64_t function_id,
+    uint64_t function_hash,
     const void* input_buffer,
     size_t input_buffer_size,
     void* output_buffer,
@@ -105,6 +118,26 @@ OE_INLINE size_t oe_wcslen(const wchar_t* s)
 {
     return wcslen(s);
 }
+
+#if __GNUC__
+#define EDGER8R_WEAK_ALIAS(OLD, NEW) \
+    extern __typeof(OLD) NEW __attribute__((__weak__, alias(#OLD)))
+#elif _MSC_VER
+#define EDGER8R_WEAK_ALIAS(OLD, NEW) \
+    __pragma(comment(linker, "/alternatename:" #NEW "=" #OLD))
+#else
+#error OE_WEAK_ALIAS not implemented
+#endif
+
+// Statically defined functions which are aliased should be marked as unused
+// to prevent compiler warnings in GCC and Clang
+#if __GNUC__
+#define EDGER8R_UNUSED __attribute__((unused))
+#elif _MSC_VER
+#define EDGER8R_UNUSED
+#else
+#error EDGER8R_UNUSED not implemented
+#endif
 
 OE_EXTERNC_END
 

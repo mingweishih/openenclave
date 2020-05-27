@@ -102,7 +102,6 @@ static oe_result_t _handle_call_host_function(
     oe_call_host_function_args_t* args_ptr;
 
     oe_ocall_func_t func;
-    ocall_table_t ocall_table;
 
     size_t buffer_size;
 

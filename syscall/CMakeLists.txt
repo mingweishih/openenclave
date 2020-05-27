@@ -19,7 +19,7 @@ if (COMPILE_SYSTEM_EDL)
   add_custom_target(syscall_trusted_edl DEPENDS syscall_t.h syscall_t.c
                                                 syscall_args.h)
 
-  list(APPEND SOURCES syscall_t_wrapper.c)
+  list(APPEND SOURCES ${CMAKE_CURRENT_BINARY_DIR}/syscall_t.c)
 else ()
   # Generate headers only
   add_custom_command(
@@ -77,8 +77,10 @@ if (COMPILE_SYSTEM_EDL)
   enclave_compile_definitions(oesyscall PRIVATE OE_USE_BUILTIN_EDL)
 endif ()
 
-set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/syscall_t.c
-                            PROPERTIES COMPILE_FLAGS -DOE_NEED_STDC_NAMES)
+set_property(
+  SOURCE ${CMAKE_CURRENT_BINARY_DIR}/syscall_t.c
+  APPEND
+  PROPERTY COMPILE_DEFINITIONS OE_NEED_STDC_NAMES OE_INTERNAL_EDL)
 
 install_enclaves(
   TARGETS

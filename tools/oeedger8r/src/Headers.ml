@@ -248,6 +248,11 @@ let generate_trusted (ec : enclave_content) =
     "";
     "OE_EXTERNC_BEGIN";
     "";
+    sprintf "void oe_register_%s_enclave_functions(void);" ec.enclave_name;
+    "#ifndef OE_USE_BUILTIN_EDL";
+    "void oe_register_enclave_functions(void);";
+    "#endif";
+    "";
     "/**** Trusted function IDs ****/";
     String.concat "\n" trusted_function_ids;
     "";
@@ -343,6 +348,11 @@ let generate_untrusted (ec : enclave_content) =
     "    const oe_enclave_setting_t* settings,";
     "    uint32_t setting_count,";
     "    oe_enclave_t** enclave);";
+    "";
+    "#ifdef OE_USE_BUILTIN_EDL";
+    sprintf "void oe_register_%s_host_functions(void);" ec.enclave_name;
+    sprintf "void oe_host_register_%s_enclave_functions(oe_enclave_t* enclave);" ec.enclave_name;
+    "#endif";
     "";
     "/**** Trusted function IDs ****/";
     String.concat "\n" trusted_function_ids;
