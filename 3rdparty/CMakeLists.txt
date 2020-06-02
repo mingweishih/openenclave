@@ -19,6 +19,10 @@ else()
   add_subdirectory(dlmalloc)
 endif()
 
+if (CODE_COVERAGE OR BUILD_LIBGCOV)
+  add_subdirectory(libgcov)
+endif ()
+
 if (OE_TRUSTZONE)
   # EL: (ARM) Exception Level
   # GP: GlobalPlatform
