@@ -6,7 +6,7 @@ Introduction
 
 Unlike typical function invocations via `call` instructions, TEE functions require
 specialized calling mechanisms that allow an enclave and a host to interact with each other.
-In the Open Enclave SDK, we use OCALLs to refer to the host-side functions that for the
+In the Open Enclave SDK, we use OCALLs to refer to the host-side functions for the
 enclave to use, and use ECALLs to refer to the enclave-side functions for the host to use.
 The invocation of an OCALL/ECALL is analogous to message passing between two isolated entities via a channel.
 Regardless of the type of a channel, which depends on the implementation of TEEs, invoking an ECALL/OCALL requires
@@ -110,7 +110,7 @@ func(
 ```
 
 After looking up based on the function id (`sample_fcn_id_sample_ecall`),
-`oe_handle_call_enclave_function()` calls into the wrapper function `ecall_sample_ecall()`(defined in `samlpe_t.c`).
+`oe_handle_call_enclave_function()` calls into the wrapper function `ecall_sample_ecall()`(defined in `sample_t.c`).
 The wrapper function performs a series of checks, unmarshals the arguments, and invokes
 the ECALL implemented by the enclave with the following code snippet.
 
@@ -317,7 +317,7 @@ the number of ECALLs is different).
 Assuming that we use *weak symbol* to avoid the naming conflict of
 the wrapper function (i.e., only one implementation of the functions is picked),
 the invocation of `sample_ecall` to both enclaves ends up using the same
-table id and function id and potentially causing a mismatching;
+table id and function id and potentially causing a mismatch;
 i.e., the enclave may use the wrong table id or function id to look up the ECALL.
 
 Proposed revision
