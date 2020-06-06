@@ -392,7 +392,7 @@ Proposed revision
 -----------
 
 The main goal of this proposal is to address the limitation that different enclaves on the
-same host cannot import the same EDL files (with the same set of ECALLs). In addition,
+same host cannot import the same EDL files (i.e., uinsg the same set of ECALLs). In addition,
 the proposed revision aims to remove the needs of `_u_wrapper.c` and `_t_wrapper.c`,
 which use uncommon practices (i.e., include the source file).
 
@@ -409,7 +409,7 @@ Given that the rule of importing `EDL` files is flexible, the resulting
 ECALL table is not determinstic (i.e., can be any order based on how
 EDL files are imported).
 
-To solve the problem, this phase proposes to maintain a single table
+To solve the problem, this phase proposes to using a single table
 that stores the function pointer along with its hash (e.g., the hash of the function name).
 Take the previous example with two enclaves, the ECALL tables now beome:
 
@@ -435,6 +435,12 @@ Take the previous example with two enclaves, the ECALL tables now beome:
 The the invocation of an ECALL can then be based on the hash instead of the hard-coded
 function id.
 
+**Register Functions**
+
+In this phase, we keep the use of `_u_wrapper.c`/`_t_wrapper.c` that defines the registration
+functions per EDL. These functnios will be invoked during the enclave initialization
+(part of `_handle_init_enclave()`).
+
 **Cache the ECALL Id for the Const-Time Look-Up**
 
 Instead of implementing hash table that cannot guarantee constant-time look-up, each enclave stores the ECALLs
@@ -450,7 +456,7 @@ typedef struct oe_ecall_struct_t
 oe_ecall_struct_t _ecall_table[OE_MAX_ECALLS];
 ```
 
-In previous example, the `ecall_table` of two enclaves are as follows.
+In previous example, the content of the `ecall_table` in the two enclaves are as follows.
 - `foo`
   ```
   ecall_table[0]: { ecall_common_1_ecall, 3934942254 }
@@ -465,157 +471,208 @@ In previous example, the `ecall_table` of two enclaves are as follows.
   ecall_table[2]: { ecall_common_1_ecall, 3934942254 }
   ecall_table[3]: { ecall_bar_ecall, 4007252781 }
   ```
-Achieving the constant-time look-up means that the look-up should use id instead of hash.
+
+Achieving the constant-time look-up means that the look-up should use ids instead of hashes.
 However, from the above example, we can see that the id of the same ECALL are different across
-enclaves.
+enclaves. In other word, the host needs to use *different ids for the same ECALL on different enclaves*.
+Also, the process of obtaining the id should also take constant-time.
 
-
-
-  Because a single host may interact with multiple enclaves, we cannot directly cache the ECALL id inside an ECALL wrapper;
-  i.e., the host may use the same ECALL wrapper to dispatch the request to different enclaves. As a result, we need to
-  cache the id per enclave. More specifically, the host maintains an id caching table of ECALLs per `enclave` struct. Note that
-  this table includes all the ECALLs from multiple enclaves such that every `enclave` structs have the same table.
-  
-  Take a similar example of two enclaves: `enclave_foo` and `enclave_bar`. Both of the enclaves implement
-  the ECALL `sample_ecall`, but with different ids (e.g., `1` in `enclave_foo` and `2` in `enclave_bar`).
-  To cache the id per enclave, the `enclave` structs of both enclaves, `enclave_foo` and `_enclave_bar`,
-  on the host maintains the same table `ecall_id_table`. As a result, the index of `sample_ecall` in
-  `enclave_foo->ecall_id_table` and `enclave_bar->ecall_id_table` is the same, which allows for caching
-  the ECALL id on the per enclave basis.
-  
-  With this, the ECALL wrapper looks up the id to the per-enclave caching table and then obtains
-  the ECALL id from the enclave (via a specialized ECALLs) for the first invocation.
-  In the subsequent invocations, the ECALL wrapper uses the cached caching table id and per-enclave
-  ECALL id to make the ECALL. See the following code snippet for an example.
-  
+To meet these requirements, we use the following scheme.
+- The host maintains a global ECALL table that keeps track of all the ECALLs from the instantiated enclaves.
+  The table stores the hash of each ECALL, defined as follows.
   ```
-  oe_result_t oe_verify_report_ecall(
-    oe_enclave_t* enclave,
-    oe_result_t* _retval,
-    const void* report,
-    size_t report_size)
+  uint64_t _global_ecall_table[OE_GLOBAL_ECALL_MAX];
+  ```
+- The global table is updated during the initialization of each enclave. More specifically, we introduce
+  a new ECALL registration function.
+  ```
+  oe_result_t oe_update_global_ecall_table(uint64_t* ecall_hashes, uint32_t num_ecalls)
   {
-      oe_result_t _result = OE_FAILURE;
+      oe_result_t result = OE_FAILURE;
+      uint32_t i;
 
-      /* CRC32 of oe_verify_report_ecall */
-      const uint32_t _function_hash = 3802944385;
+      for (i = 0; i < num_ecalls; i++)
+      {
+          if (oe_get_global_enclave_function_id_by_hash(ecall_hashes[i]) !=
+                  OE_GLOBAL_ECALL_ID_NULL)
+              continue;
 
-      /* Used to cache the index to the id caching table. */
-      static int _caching_table_id = OE_HOST_ECALL_ID_NULL;
+          if (_global_ecall_table_size >= OE_GLOBAL_ECALL_MAX)
+              OE_RAISE(OE_OUT_OF_BOUND);
 
-      int _ecall_id = -1;
+          _global_ecall_table[_global_ecall_table_size] = ecall_hashes[i];
+          _global_ecall_table_size++;
+      }
+      
+      result = OE_OK;
+  done;
+      return result;
+  }
+  ```
+- The host maintains a per-enclave ECALL table based on the global ECALL table.
+  This ensures that the same ECALL on each per-enclave ECALL table has the same id.
+  For example, the per-enclave ECALL table is defined as follows.
+  ```
+  typedef struct _oe_ecall_id_t
+  {
+     uint64_t id;
+     uint64_t hash;
+  } oe_ecall_id_t;
+  
+  typedef struct _oe_enclave
+  {
+     ...
+     /* Per-edl ecall table. */
+     oe_ecall_id_t ecall_id_table[OE_ECALL_MAX];
+     uint32_t ecall_id_table_size;
+     ...
+  } oe_enclave_t;
+  ```
+  The example of a registration function is as follows.
+  ```
+  oe_result_t oe_host_register_enclave_functions(
+    oe_enclave_t* enclave,
+    const uint64_t* ecall_hashes,
+    uint32_t num_ecalls)
+  {
+      uint32_t i;
+ 
+      oe_update_global_ecall_table(ecall_hashes, num_ecalls);
       
       ...
-      
-      /* Check if the index is cached. */
-      if (_caching_table_id == OE_HOST_ECALL_ID_NULL)
+      for (i = 0; i < _global_ecall_table_size; i++)
       {
-        _caching_table_id = oe_host_get_ecall_id_by_hash(
-            enclave,
-            _function_hash);
+          enclave->ecall_id_table[i].hash = _global_ecall_table[i];
+          enclave->ecall_id_table[i].id = OE_ECALL_ID_NULL;
       }
-
-      ...
-      
-      /* Obtain the ecall id from the caching table. */
-      _ecall_id = oe_get_ecall_function_id(enclave, _caching_table_id);
-      if (_ecall_id == -1)
-      {
-          oe_call_enclave_get_function_id_by_hash(
-              enclave,
-              _function_hash,
-              &_ecall_id);
-          oe_set_ecall_function_id(enclave, _caching_table_id, _ecall_id);
-      }
-     
-      /* Call enclave function. */
-      if ((_result = oe_call_enclave_function(
-             enclave,
-            (uint64_t) _ecall_id,
-            (uint64_t) _function_hash,
-            _input_buffer,
-            _input_buffer_size,
-            _output_buffer,
-            _output_buffer_size,
-            &_output_bytes_written)) != OE_OK)
-          goto done;
-          
       ...
   }
   ```
-**Extening the idea to OCALLs**
-
-Although the OCALLs do not suffer the same limitation as ECALLs, we could
-extend the idea to exclude the needs of using wrapper files for `_t.c` and `_u.c`
-completely. Recall that the wrapper are needed to replace the stub code on
-both 
-
-**Add the registration functions of ECALLs and OCALLs in `_t.c` and `_u.c`**
-
-Instead of using wrappers for `_t.c` and `_u.c` files, each `_t.c` or `_u.c` now
-includes functions that register the list of OCALLs/ECALLs by passing the function
-pointers and the hashes of function names. See the following example.
-  
-```
-/**** ECALL function table. ****/
-static oe_ecall_struct_t __oe_ecall_table[] = {
-    { (oe_ecall_func_t) ecall_oe_verify_report_ecall, 3802944385 },
-    { (oe_ecall_func_t) ecall_oe_get_public_key_ecall, 1967956880 },
-    { (oe_ecall_func_t) ecall_oe_get_public_key_by_policy_ecall, 550431498 },
-    { (oe_ecall_func_t) ecall_oe_log_init_ecall, 4072068939 }
-};
-static uint32_t __oe_ecall_table_size = 4;
-
-/* Ecall table registration function. */
-void oe_register_core_enclave_functions(void)
-{
-    oe_register_enclave_functions_internal(
-        __oe_ecall_table,
-        __oe_ecall_table_size);
-}
-#ifndef OE_INTERNAL_EDL
-EDGER8R_WEAK_ALIAS(oe_register_core_enclave_functions, oe_register_enclave_functions);
-#endif
-```
-
-- Caching an OCALL id.
-
-  Because an enclave only interacts with a single host, the case of OCALL wrapper is straightforward:
-  caching the id within the implementation of the wrapper.
-
+- In the first invocation of an ECALL, the host query the ECALL id by hash from the target enclave
+  (via a special ECALL). Then the host caches the id in the per-enclave ECALL table.
+  For the subsequent invocations, the host uses the cached id from the per-enclave ECALL table (looked
+  up using the same id across different enclaves).
+  These logic can be implemented as part of `oe_call_enclave_function()`, see the following example.
   ```
-  oe_result_t oe_log_ocall(
-      uint32_t log_level,
-      const char* message)
+  oe_result_t oe_call_enclave_function(
+      oe_enclave_t* enclave,
+      uint64_t* global_function_id,
+      uint64_t function_hash,
+      const void* input_buffer,
+      size_t input_buffer_size,
+      void* output_buffer,
+      size_t output_buffer_size,
+      size_t* output_bytes_written)
+  {
+    ...
+    uint64_t function_id = OE_ECALL_ID_NULL;
+    static oe_mutex _ecall_lock = OE_H_MUTEX_INITIALIZER;
+
+    ...
+    oe_mutex_lock(&_ecall_lock);
+    if (*global_function_id == OE_GLOBAL_ECALL_ID_NULL)
+    {
+        /* Look up the id from the per-enclave table by hash. */
+        OE_CHECK(oe_get_local_enclave_function_id_by_hash(
+            enclave, function_hash, global_function_id));
+    }
+    oe_mutex_unlock(&_ecall_lock);
+
+    OE_CHECK(
+        oe_get_enclave_function_id(enclave, *global_function_id, &function_id));
+    if (function_id == OE_ECALL_ID_NULL)
+    {
+        /* Make a special ECALL to get the function id. */
+        oe_call_enclave_get_function_id_by_hash(
+            enclave, function_hash, &function_id);
+        OE_CHECK(oe_set_enclave_function_id(
+            enclave, *global_function_id, function_id));
+    }
+
+    /* Initialize the call_enclave_args structure */
+    {
+        args.function_id = function_id;
+        args.function_hash = function_hash;
+        args.input_buffer = input_buffer;
+        args.input_buffer_size = input_buffer_size;
+        args.output_buffer = output_buffer;
+        args.output_buffer_size = output_buffer_size;
+        args.output_bytes_written = 0;
+        args.result = OE_UNEXPECTED;
+    }
+    ```
+    Accordingly, the ECALL stub code can be slightly modified as follows.
+    ```
+    oe_result_t oe_get_public_key_ecall(
+       oe_enclave_t* enclave,
+       oe_result_t* _retval,
+       const oe_asymmetric_key_params_t* key_params,
+       const void* key_info,
+       size_t key_info_size,
+       void* key_buffer,
+       size_t key_buffer_size,
+       size_t* key_buffer_size_out)
     {
         oe_result_t _result = OE_FAILURE;
 
-        /* CRC32 of oe_log_ocall */
-        const uint32_t _function_hash = 3195194105;
+        /* CRC32 of oe_get_public_key_ecall */
+        const uint64_t _function_hash = 1967956880;
 
-        /* Used to cache the ocall id. */
-        static int _ocall_id = OE_OCALL_ID_NULL;
-        
-        ...
-        
-        /* Check if the ocall id is cached. */
-        if (_ocall_id == OE_OCALL_ID_NULL)
-          _ocall_id = oe_host_get_ocall_id_by_hash(_function_hash);
-
-        /* Call host function. */
-        if ((_result = oe_call_host_function(
-             (uint64_t) _ocall_id,
-             (uint64_t) _function_hash,
-             _input_buffer,
-             _input_buffer_size,
-             _output_buffer,
-             _output_buffer_size,
-             &_output_bytes_written)) != OE_OK)
-            goto done;
+        /* Used to cache the id in the ecall id caching table. */
+        static uint64_t _global_ecall_id = OE_GLOBAL_ECALL_ID_NULL;
 
         ...
-     }
+
+        /* Call enclave function. */
+        if ((_result = oe_call_enclave_function(
+                enclave,
+               &_global_ecall_id,
+               _function_hash,
+               _input_buffer,
+               _input_buffer_size,
+               _output_buffer,
+               _output_buffer_size,
+               &_output_bytes_written)) != OE_OK)
+           goto done;
+       ...
+    }
+    ```
+    Effecitvely, passing the `_global_ecall_id` to  `oe_call_enclave_function`. The
+    `_global_ecall_id` is used to cache the corresponding id in the per-enclave table
+    (i.e., remains the same across differnt enclaves).
+
+In our previous example, assuming that the host instantiates the `foo` before `bar`.
+By applying the above scheme, the host will maintain the following data structures.
+- `_global_ecall_table`
   ```
+  _global_ecall_table[0]: 3934942254 /* ecall_common_1_ecall */
+  _global_ecall_table[1]: 1220950296 /* ecall_common_2_ecall_1 */
+  _global_ecall_table[2]: 3520030882 /* ecall_common_2_ecall_2 */
+  _global_ecall_table[3]: 2696310045 /* ecall_foo_ecall */
+  _global_ecall_table[4]: 4007252781 /* ecall_bar_ecall */
+  ```
+- `foo` (at the time `bar` is not initialized yet)
+  ```
+  enclave->ecall_id_table[0]: { 0, 3934942254 /* ecall_common_1_ecall */ }
+  enclave->ecall_id_table[1]: { 1, 1220950296 /* ecall_common_2_ecall_1 */ }
+  enclave->ecall_id_table[2]: { 2, 3520030882 /* ecall_common_2_ecall_2 */ }
+  enclave->ecall_id_table[3]: { 3, 2696310045 /* ecall_foo_ecall */ }
+  ```
+- `bar`
+  ```
+  enclave->ecall_id_table[0]: { 2, 3934942254 /* ecall_common_1_ecall */ }
+  enclave->ecall_id_table[1]: { 0, 1220950296 /* ecall_common_2_ecall_1 */ }
+  enclave->ecall_id_table[2]: { 1, 3520030882 /* ecall_common_2_ecall_2 */ }
+  enclave->ecall_id_table[3]: { OE_ECALL_ID_NULL, 2696310045 /* ecall_foo_ecall */ }
+  enclave->ecall_id_table[4]: { 3, 4007252781 /* ecall_bar_ecall */ }
+  ```
+As we can see, the scheme allows the host to use the same id to look up different ECALL id
+from the per-enclave table and therefore achieves the goal of constant-time look-up.
+
+## Phase 2: Remove the wrapper files of `_t.c` and `_u.c`
+
+(To be added)
+
 
 Authors
 -------
