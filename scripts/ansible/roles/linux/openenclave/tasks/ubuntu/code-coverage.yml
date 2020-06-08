@@ -24,4 +24,3 @@
 - name: Install all the prerequisites PyPI packages for code coverage
   pip:
     name: "{{ pip_packages_code_coverage }}"
-    executable: pip3
