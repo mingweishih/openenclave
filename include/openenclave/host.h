@@ -194,7 +194,7 @@ oe_result_t oe_create_enclave(
     uint32_t flags,
     const oe_enclave_setting_t* settings,
     uint32_t setting_count,
-    const oe_ocall_struct_t* ocall_table,
+    const oe_ocall_func_t* ocall_table,
     uint32_t ocall_count,
     const uint64_t* ecall_hash_table,
     uint32_t ecall_hash_count,

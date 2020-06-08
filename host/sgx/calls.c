@@ -221,10 +221,8 @@ oe_result_t oe_handle_call_host_function(uint64_t arg, oe_enclave_t* enclave)
     oe_result_t result = OE_OK;
     oe_ocall_func_t func = NULL;
     size_t buffer_size = 0;
+    ocall_table_t ocall_table;
 
-    OE_UNUSED(enclave);
-
-    printf("[oe_handle_call_host_function]\n");
     args_ptr = (oe_call_host_function_args_t*)arg;
     if (args_ptr == NULL)
         OE_RAISE(OE_INVALID_PARAMETER);
@@ -233,18 +231,35 @@ oe_result_t oe_handle_call_host_function(uint64_t arg, oe_enclave_t* enclave)
     if (args_ptr->input_buffer == NULL || args_ptr->output_buffer == NULL)
         OE_RAISE(OE_INVALID_PARAMETER);
 
-    // Validate the function id.
-    OE_CHECK(oe_is_host_function_id_valid(args_ptr->function_id));
-
-    // Validate the function hash.
     printf(
-        "[oe_handle_call_host_function] target hash: %lu, expected hash: %lu\n",
-        args_ptr->function_hash,
-        _ocall_table[args_ptr->function_id].hash);
-    if (args_ptr->function_hash != _ocall_table[args_ptr->function_id].hash)
-        OE_RAISE(OE_FAILURE);
+        "[oe_handle_call_host_function] table id: %lu\n", args_ptr->table_id);
+    // Resolve which ocall table to use.
+    if (args_ptr->table_id == OE_UINT64_MAX)
+    {
+        ocall_table.ocalls = enclave->ocalls;
+        ocall_table.num_ocalls = enclave->num_ocalls;
+    }
+    else
+    {
+        if (args_ptr->table_id >= OE_MAX_OCALL_TABLES)
+            OE_RAISE(OE_NOT_FOUND);
 
-    func = _ocall_table[args_ptr->function_id].ocall;
+        ocall_table.ocalls = _ocall_tables[args_ptr->table_id].ocalls;
+        ocall_table.num_ocalls = _ocall_tables[args_ptr->table_id].num_ocalls;
+
+        if (!ocall_table.ocalls)
+            OE_RAISE(OE_NOT_FOUND);
+    }
+
+    printf(
+        "[oe_handle_call_host_function] function id: %lu, num_ocalls: %zu\n",
+        args_ptr->function_id,
+        ocall_table.num_ocalls);
+    // Fetch matching function.
+    if (args_ptr->function_id >= ocall_table.num_ocalls)
+        OE_RAISE(OE_NOT_FOUND);
+
+    func = ocall_table.ocalls[args_ptr->function_id];
     if (func == NULL)
     {
         result = OE_NOT_FOUND;
@@ -381,10 +396,6 @@ static oe_result_t _handle_ocall(
 
         case OE_OCALL_GET_TIME:
             oe_handle_get_time(arg_in, arg_out);
-            break;
-
-        case OE_OCALL_GET_FUNCTION_ID_BY_HASH:
-            oe_get_function_id_by_hash(arg_in, arg_out);
             break;
 
         default:

@@ -81,22 +81,57 @@ typedef struct oe_ecall_struct_t
  * expected.
  */
 oe_result_t oe_call_host_function(
-    uint64_t* function_id,
-    uint64_t function_hash,
+    size_t function_id,
     const void* input_buffer,
     size_t input_buffer_size,
     void* output_buffer,
     size_t output_buffer_size,
-    size_t* output_bytes_written,
-    bool switchless);
+    size_t* output_bytes_written);
+
+/**
+ * Perform a high-level host function call (OCALL) switchlessly.
+ *
+ * Call the host function whose matching the given function_id.
+ * The host function is expected to have the following signature:
+ *
+ *     void (const uint8_t* input_buffer,
+ *           size_t input_buffer_size,
+ *           uint8_t* output_buffer,
+ *           size_t output_buffer_size,
+ *           size_t* output_bytes_written);
+ *
+ * Note that the return value of this function only indicates the success of
+ * the call and not of the underlying function. The OCALL implementation must
+ * define its own error reporting scheme via the arguments or return value.
+ *
+ * @param function_id The id of the host function that will be called.
+ * @param input_buffer Buffer containing inputs data.
+ * @param input_buffer_size Size of the input data buffer.
+ * @param output_buffer Buffer where the outputs of the host function are
+ * written to.
+ * @param output_buffer_size Size of the output buffer.
+ * @param output_bytes_written Number of bytes written in the output buffer.
+ *
+ * @return OE_OK the call was successful.
+ * @return OE_NOT_FOUND if the function_id does not correspond to a function.
+ * @return OE_INVALID_PARAMETER a parameter is invalid.
+ * @return OE_FAILURE the call failed.
+ * @return OE_BUFFER_TOO_SMALL the input or output buffer was smaller than
+ * expected.
+ */
+oe_result_t oe_switchless_call_host_function(
+    size_t function_id,
+    const void* input_buffer,
+    size_t input_buffer_size,
+    void* output_buffer,
+    size_t output_buffer_size,
+    size_t* output_bytes_written);
 
 #define OE_OCALL_ID_NULL OE_UINT64_MAX
 
 oe_result_t oe_register_enclave_functions_internal(
     const oe_ecall_struct_t* ecall_table,
     uint32_t num_ecalls);
-
-uint64_t oe_host_get_ocall_id_by_hash(uint64_t hash);
 
 /**
  * Allocate a buffer of given size for doing an ocall.

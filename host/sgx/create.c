@@ -80,17 +80,15 @@ static void _initialize_exception_handling(void)
 **==============================================================================
 */
 
-static void _initialize_enclave_host(
-    const oe_ocall_struct_t* ocall_table,
-    uint32_t ocall_count)
+static void _initialize_enclave_host()
 {
     oe_once(&_enclave_init_once, _initialize_exception_handling);
 
-    oe_register_host_functions(ocall_table, ocall_count);
 #ifdef OE_USE_BUILTIN_EDL
-    oe_register_core_host_functions();
-    oe_register_platform_host_functions();
-    oe_register_syscall_host_functions();
+    oe_register_core_ocall_function_table(OE_CORE_OCALL_FUNCTION_TABLE_ID);
+    oe_register_platform_ocall_function_table(OE_SGX_OCALL_FUNCTION_TABLE_ID);
+    oe_register_syscall_ocall_function_table(
+        OE_SYSCALL_OCALL_FUNCTION_TABLE_ID);
 #endif // OE_USE_BUILTIN_EDL
 }
 
@@ -905,7 +903,7 @@ oe_result_t oe_create_enclave(
     uint32_t flags,
     const oe_enclave_setting_t* settings,
     uint32_t setting_count,
-    const oe_ocall_struct_t* ocall_table,
+    const oe_ocall_func_t* ocall_table,
     uint32_t ocall_count,
     const uint64_t* ecall_hash_table,
     uint32_t ecall_hash_count,
@@ -915,7 +913,7 @@ oe_result_t oe_create_enclave(
     oe_enclave_t* enclave = NULL;
     oe_sgx_load_context_t context;
 
-    _initialize_enclave_host(ocall_table, ocall_count);
+    _initialize_enclave_host();
 
 #if _WIN32
     if (flags & OE_ENCLAVE_FLAG_SIMULATE)
@@ -1018,6 +1016,11 @@ oe_result_t oe_create_enclave(
         enclave->debug_enclave = debug_enclave;
         oe_debug_notify_enclave_created(debug_enclave);
     }
+
+    /* Enclave initialization invokes global constructors which could make
+     * ocalls. Therefore setup ocall table prior to initialization. */
+    enclave->ocalls = (const oe_ocall_func_t*)ocall_table;
+    enclave->num_ocalls = ocall_count;
 
     /* Invoke enclave initialization. */
     OE_CHECK(_initialize_enclave(enclave));

@@ -350,7 +350,7 @@ let generate_untrusted (ec : enclave_content) =
     "    oe_enclave_t** enclave);";
     "";
     "#ifdef OE_USE_BUILTIN_EDL";
-    sprintf "void oe_register_%s_host_functions(void);" ec.enclave_name;
+    sprintf "void oe_register_%s_ocall_function_table(uint64_t table_id);" ec.enclave_name;
     sprintf "void oe_host_register_%s_enclave_functions(oe_enclave_t* enclave);" ec.enclave_name;
     "#endif";
     "";

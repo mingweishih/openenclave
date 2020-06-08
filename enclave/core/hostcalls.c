@@ -177,12 +177,3 @@ int oe_host_write(int device, const char* str, size_t len)
 
     return 0;
 }
-
-uint64_t oe_host_get_ocall_id_by_hash(uint64_t hash)
-{
-    uint64_t id = OE_OCALL_ID_NULL;
-
-    oe_ocall(OE_OCALL_GET_FUNCTION_ID_BY_HASH, hash, &id);
-
-    return id;
-}

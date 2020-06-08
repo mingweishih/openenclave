@@ -719,15 +719,14 @@ done:
 /*
 **==============================================================================
 **
-** oe_call_host_function()
-** This is the preferred way to call host functions.
+** oe_call_host_function_by_table_id()
 **
 **==============================================================================
 */
 
-oe_result_t oe_call_host_function(
-    uint64_t* function_id,
-    uint64_t function_hash,
+oe_result_t oe_call_host_function_by_table_id(
+    uint64_t table_id,
+    uint64_t function_id,
     const void* input_buffer,
     size_t input_buffer_size,
     void* output_buffer,
@@ -737,26 +736,10 @@ oe_result_t oe_call_host_function(
 {
     oe_result_t result = OE_UNEXPECTED;
     oe_call_host_function_args_t* args = NULL;
-    uint64_t _function_id = OE_OCALL_ID_NULL;
-    static oe_spinlock_t _lock = OE_SPINLOCK_INITIALIZER;
 
     /* Reject invalid parameters */
-    if (!function_id || !input_buffer || input_buffer_size == 0)
+    if (!input_buffer || input_buffer_size == 0)
         OE_RAISE(OE_INVALID_PARAMETER);
-
-    /*
-     * Check if the OCALL id is set. If not, making a special OCALL to query the
-     * id by hash. Note that after the first OCALL, the id will be cached. Since
-     * the id is a static variable, using lock around its memory accesses.
-     */
-    oe_spin_lock(&_lock);
-    _function_id = *function_id;
-    if (_function_id == OE_OCALL_ID_NULL)
-    {
-        _function_id = oe_host_get_ocall_id_by_hash(function_hash);
-        *function_id = _function_id;
-    }
-    oe_spin_unlock(&_lock);
 
     /*
      * oe_post_switchless_ocall (below) can make a regular ocall to wake up the
@@ -774,8 +757,8 @@ oe_result_t oe_call_host_function(
         OE_RAISE(OE_UNEXPECTED);
     }
 
-    args->function_id = _function_id;
-    args->function_hash = function_hash;
+    args->table_id = table_id;
+    args->function_id = function_id;
     args->input_buffer = input_buffer;
     args->input_buffer_size = input_buffer_size;
     args->output_buffer = output_buffer;
@@ -821,6 +804,34 @@ oe_result_t oe_call_host_function(
 done:
 
     return result;
+}
+
+/*
+**==============================================================================
+**
+** oe_call_host_function()
+** This is the preferred way to call host functions.
+**
+**==============================================================================
+*/
+
+oe_result_t oe_call_host_function(
+    size_t function_id,
+    const void* input_buffer,
+    size_t input_buffer_size,
+    void* output_buffer,
+    size_t output_buffer_size,
+    size_t* output_bytes_written)
+{
+    return oe_call_host_function_by_table_id(
+        OE_UINT64_MAX,
+        function_id,
+        input_buffer,
+        input_buffer_size,
+        output_buffer,
+        output_buffer_size,
+        output_bytes_written,
+        false /* non-switchless */);
 }
 
 /*

@@ -115,6 +115,10 @@ typedef struct _oe_enclave
     /* Hash of enclave (MRENCLAVE) */
     OE_SHA256 hash;
 
+    /* Array of ocall functions */
+    const oe_ocall_func_t* ocalls;
+    size_t num_ocalls;
+
     /* Per-edl ecall table. */
     oe_ecall_id_t ecall_id_table[256];
     uint32_t ecall_id_table_size;

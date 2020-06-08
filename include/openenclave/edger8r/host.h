@@ -72,8 +72,9 @@ oe_result_t oe_call_enclave_function(
     size_t output_buffer_size,
     size_t* output_bytes_written);
 
-oe_result_t oe_register_host_functions(
-    const oe_ocall_struct_t* ocall_table,
+oe_result_t oe_register_ocall_function_table(
+    uint64_t table_id,
+    const oe_ocall_func_t* ocall_table,
     uint32_t num_ocalls);
 
 #define OE_GLOBAL_ECALL_ID_NULL OE_UINT64_MAX

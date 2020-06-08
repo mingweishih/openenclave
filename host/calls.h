@@ -9,6 +9,14 @@
 #ifndef OE_HOST_CALLS_H
 #define OE_HOST_CALLS_H
 
+typedef struct _ocall_table
+{
+    const oe_ocall_func_t* ocalls;
+    size_t num_ocalls;
+} ocall_table_t;
+
+extern ocall_table_t _ocall_tables[];
+
 extern oe_ocall_struct_t _ocall_table[];
 
 #define OE_ECALL_ID_NULL OE_UINT64_MAX

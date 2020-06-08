@@ -16,86 +16,29 @@
 **==============================================================================
 */
 
-#define OE_MAX_OCALLS 256
-oe_ocall_struct_t _ocall_table[OE_MAX_OCALLS];
-static uint64_t table_size;
+ocall_table_t _ocall_tables[OE_MAX_OCALL_TABLES];
 static oe_mutex _ocall_tables_lock = OE_H_MUTEX_INITIALIZER;
 
-oe_result_t oe_register_host_functions(
-    const oe_ocall_struct_t* ocall_table,
+oe_result_t oe_register_ocall_function_table(
+    uint64_t table_id,
+    const oe_ocall_func_t* ocalls,
     uint32_t num_ocalls)
 {
     oe_result_t result = OE_UNEXPECTED;
 
-    /* Nothing to add when the table is empty, fall through. */
-    if (!ocall_table || !num_ocalls)
-    {
-        result = OE_OK;
-        goto done;
-    }
+    printf("[oe_register_ocall_function_table] id: %lu\n", table_id);
+    if (table_id >= OE_MAX_OCALL_TABLES || !ocalls)
+        OE_RAISE(OE_INVALID_PARAMETER);
 
-    uint32_t i;
     oe_mutex_lock(&_ocall_tables_lock);
-    for (i = 0; i < num_ocalls; i++)
-    {
-        uint64_t hash = ocall_table[i].hash;
-        printf("[register_ocalls] %u: hash - %lu\n", i, hash);
-
-        /* The table is full. */
-        if (table_size >= OE_MAX_OCALLS)
-            OE_RAISE(OE_OUT_OF_BOUNDS);
-
-        /* Each table should be registered only once. */
-        /* XXX: Consider raising failts. */
-        if (oe_get_host_function_id_by_hash(hash) != OE_OCALL_ID_NULL)
-            continue;
-
-        _ocall_table[table_size].ocall = ocall_table[i].ocall;
-        _ocall_table[table_size].hash = hash;
-        printf("Registered at ocall_table: %lu\n", table_size);
-        table_size++;
-    }
+    _ocall_tables[table_id].ocalls = ocalls;
+    _ocall_tables[table_id].num_ocalls = num_ocalls;
     oe_mutex_unlock(&_ocall_tables_lock);
-    result = OE_OK;
-
-done:
-    return result;
-}
-
-oe_result_t oe_is_host_function_id_valid(uint64_t id)
-{
-    oe_result_t result = OE_UNEXPECTED;
-
-    if (!table_size || id > table_size)
-        goto done;
 
     result = OE_OK;
 
 done:
     return result;
-}
-
-uint64_t oe_get_host_function_id_by_hash(uint64_t hash)
-{
-    uint64_t id = OE_OCALL_ID_NULL;
-    uint64_t i;
-
-    for (i = 0; i < OE_MAX_OCALLS; i++)
-    {
-        if (_ocall_table[i].hash == hash)
-        {
-            id = i;
-            break;
-        }
-    }
-    return id;
-}
-
-void oe_get_function_id_by_hash(uint64_t hash, uint64_t* arg_out)
-{
-    uint64_t id = oe_get_host_function_id_by_hash(hash);
-    printf("[oe_get_function_id_by_hash] hash: %lu, id: %lu\n", hash, id);
-    *arg_out = id;
 }
 
 /*

@@ -666,26 +666,20 @@ let get_ocall_function_wrapper get_deepcopy enclave_name (uf : untrusted_func) =
     if uf.uf_is_switchless then [ "const bool is_switchless = true;"]
     else [ "const bool is_switchless = false;" ]
   in
-  let allocate_buffer, free_buffer =
+  let allocate_buffer, call_function, free_buffer =
     if uf.uf_is_switchless then
       ( "oe_allocate_switchless_ocall_buffer",
+        "oe_switchless_call_host_function",
         "oe_free_switchless_ocall_buffer" )
     else
       ( "oe_allocate_ocall_buffer",
+        "oe_call_host_function",
         "oe_free_ocall_buffer" )
   in
   [
     get_wrapper_prototype fd false;
     "{";
     "    oe_result_t _result = OE_FAILURE;";
-    "";
-    sprintf "    /* CRC32 of %s */" fd.fname;
-    sprintf "    const uint64_t _function_hash = %d;" (crc32 fd.fname);
-    "";
-    "    /* Used to cache the ocall id. */";
-    "    static uint64_t _ocall_id = OE_OCALL_ID_NULL;";
-    "";
-    String.concat "\n    " is_switchless;
     "";
     "    /* If the enclave is in crashing/crashed status, new OCALL should fail";
     "       immediately. */";
@@ -716,18 +710,16 @@ let get_ocall_function_wrapper get_deepcopy enclave_name (uf : untrusted_func) =
     ^ String.concat "\n    " (get_input_buffer get_deepcopy fd allocate_buffer);
     "";
     "    /* Call host function. */";
-    "    if ((_result = oe_call_host_function(";
+    "    if ((_result = " ^ call_function ^ "(";
     "             "
     ^ String.concat ",\n             "
         [
-          "&_ocall_id";
-          "_function_hash";
+          get_function_id enclave_name fd;
           "_input_buffer";
           "_input_buffer_size";
           "_output_buffer";
           "_output_buffer_size";
-          "&_output_bytes_written";
-          "is_switchless)) != OE_OK)";
+          "&_output_bytes_written)) != OE_OK)";
         ];
     "        goto done;";
     "";
@@ -990,26 +982,24 @@ let generate_untrusted (ec : enclave_content) (ep : Intel.Util.edger8r_params) =
   in
   let ocall_table =
     let table = "__oe_ocall_table" in
-    let register_function = "oe_register_" ^ ec.enclave_name ^ "_host_functions" in
+    let register_function = "oe_register_" ^ ec.enclave_name ^ "_ocall_function_table" in
     if ufs <> [] then
       [
-        sprintf "static oe_ocall_struct_t %s[] = {" table;
+        sprintf "static oe_ocall_func_t %s[] = {" table;
         "    "
         ^ String.concat ",\n    "
           (List.map
-             (fun f ->
-               sprintf "{ (oe_ocall_func_t) ocall_%s, %d }"
-                 f.uf_fdecl.fname
-                 (crc32 f.uf_fdecl.fname))
-             ufs);
+             (fun f -> "(oe_ocall_func_t) ocall_" ^ f.uf_fdecl.fname)
+             ec.ufunc_decls);
         "};";
         "";
         sprintf "static uint32_t %s_size = %d;" table (List.length ufs);
         "";
-        "/* Ocall functions registration function. */";
-        sprintf "void %s(void)" register_function;
+        "/* Ocall function table registration. */";
+        sprintf "void %s(uint64_t id)" register_function;
         "{";
-        "    oe_register_host_functions(";
+        "    oe_register_ocall_function_table(";
+        "        id,";
         sprintf "        %s," table;
         sprintf "        %s_size);" table;
         "}";

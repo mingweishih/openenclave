@@ -203,8 +203,12 @@ typedef struct _oe_call_enclave_function_args
 
 typedef struct _oe_call_host_function_args
 {
+    // OE_UINT64_MAX refers to default function table. Other values are
+    // reserved for alternative function tables.
+    uint64_t table_id;
+
     uint64_t function_id;
-    uint64_t function_hash;
+
     const void* input_buffer;
     size_t input_buffer_size;
     void* output_buffer;
@@ -212,6 +216,24 @@ typedef struct _oe_call_host_function_args
     size_t output_bytes_written;
     oe_result_t result;
 } oe_call_host_function_args_t;
+
+/*
+**==============================================================================
+**
+** oe_call_host_function_by_table_id()
+**
+**==============================================================================
+*/
+
+oe_result_t oe_call_host_function_by_table_id(
+    size_t table_id,
+    size_t function_id,
+    const void* input_buffer,
+    size_t input_buffer_size,
+    void* output_buffer,
+    size_t output_buffer_size,
+    size_t* output_bytes_written,
+    bool switchless);
 
 /*
 **==============================================================================
@@ -357,7 +379,7 @@ oe_result_t oe_ocall(uint16_t func, uint64_t arg_in, uint64_t* arg_out);
 
 #define OE_SYSCALL_OCALL_FUNCTION_TABLE_ID 2
 #define OE_SYSCALL_ECALL_FUNCTION_TABLE_ID 2
-
+#if 0
 /* Register the OCALL table needed by the common TEE interface (host side). */
 oe_result_t oe_register_core_ocall_function_table(void);
 
@@ -377,7 +399,7 @@ void oe_register_syscall_ocall_function_table(void);
 
 /* Register the ECALL table needed by the SYSCALL interface (enclave side). */
 void oe_register_syscall_ecall_function_table(void);
-
+#endif
 #endif // OE_USE_BUILTIN_EDL
 
 OE_EXTERNC_END
