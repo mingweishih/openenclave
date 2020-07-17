@@ -102,3 +102,14 @@ int pthread_detach(pthread_t thread)
 
     return _pthread_hooks->detach(thread);
 }
+
+#if 0
+int pthread_setcancelstate(int new, int *old)
+{
+	if (new > 2U) return EINVAL;
+	struct __pthread *self = __pthread_self();
+	if (old) *old = self->canceldisable;
+	self->canceldisable = new;
+	return 0;
+}
+#endif

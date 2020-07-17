@@ -48,12 +48,15 @@ static long _syscall_clock_gettime(long n, long x1, long x2)
     if (!tp)
         goto done;
 
+    (void)clk_id;
+#if 0
     if (clk_id != CLOCK_REALTIME)
     {
         /* Only supporting CLOCK_REALTIME */
         oe_assert("clock_gettime(): panic" == NULL);
         goto done;
     }
+#endif
 
     if ((msec = oe_get_time()) == (uint64_t)-1)
         goto done;
