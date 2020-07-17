@@ -4,9 +4,9 @@
 add_enclave_library(
   oecryptombed
   STATIC
-  ../../../common/asn1.c
-  ../../../common/cert.c
-  ../../../common/kdf.c
+  ${PROJECT_SOURCE_DIR}/common/asn1.c
+  ${PROJECT_SOURCE_DIR}/common/cert.c
+  ${PROJECT_SOURCE_DIR}/common/kdf.c
   asn1.c
   cert.c
   crl.c

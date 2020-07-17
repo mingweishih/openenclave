@@ -58,7 +58,12 @@ enclave_enable_code_coverage(oeenclave)
 # functions implemented via EDL files.
 enclave_include_directories(oeenclave PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/core)
 
-enclave_link_libraries(oeenclave PUBLIC oecryptombed)
+if (USE_OPENSSL)
+  enclave_link_libraries(oeenclave PUBLIC oecryptoopenssl)
+else ()
+  enclave_link_libraries(oeenclave PUBLIC oecryptombed)
+endif ()
+
 if (OE_TRUSTZONE)
   enclave_link_libraries(oeenclave PUBLIC oelibutee)
 endif ()

@@ -2,4 +2,4 @@
 # Licensed under the MIT License.
 
 add_subdirectory(mbedtls)
-#add_subdirectory(openssl)
+add_subdirectory(openssl)

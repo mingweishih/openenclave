@@ -237,6 +237,10 @@ if (NOT USE_SNMALLOC)
   set(USE_DLMALLOC true)
 endif ()
 
+option(USE_OPENSSL
+       "[EXPERIMENTAL] Build using openssl. If this is not set, mbed is used."
+       OFF)
+
 option(
   COMPILE_SYSTEM_EDL
   "Build system ecalls and ocalls into OE libraries. If not set, they must be included by application EDL to use."
