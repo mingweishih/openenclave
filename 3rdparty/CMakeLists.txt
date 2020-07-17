@@ -14,6 +14,8 @@ add_subdirectory(libunwind)
 add_subdirectory(musl)
 add_subdirectory(mbedtls)
 
+add_subdirectory(openssl)
+
 if (OE_SGX AND COMPILER_SUPPORTS_SNMALLOC)
   # snmalloc is most useful in multi-threaded enclaves. Currently, only
   # SGX enclaves can be multi-threaded.
