@@ -19,5 +19,9 @@ add_enclave(
   enc.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/tls_t.c)
 
+if (USE_OPENSSL)
+  enclave_compile_definitions(tls_enc PRIVATE OE_USE_OPENSSL)
+endif ()
+
 enclave_include_directories(tls_enc PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 enclave_link_libraries(tls_enc oeenclave oelibc)

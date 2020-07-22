@@ -198,18 +198,18 @@ oe_result_t oe_ec_generate_key_pair_from_private(
         OE_RAISE(OE_INVALID_PARAMETER);
     }
 
-    /* Initialize OpenSSL. */
+    /* Initialize OpenSSL */
     oe_initialize_openssl();
 
-    /* Initialize the EC key. */
+    /* Initialize the EC key */
     key = EC_KEY_new_by_curve_name(_get_nid(curve));
     if (key == NULL)
         OE_RAISE(OE_CRYPTO_ERROR);
 
-    /* Set the EC named-curve flag. */
+    /* Set the EC named-curve flag */
     EC_KEY_set_asn1_flag(key, OPENSSL_EC_NAMED_CURVE);
 
-    /* Load private key into the EC key. */
+    /* Load private key into the EC key */
     private_bn = BN_bin2bn(private_key_buf, (int)private_key_buf_size, NULL);
 
     if (private_bn == NULL)

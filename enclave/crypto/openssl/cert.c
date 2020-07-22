@@ -972,30 +972,40 @@ done:
 
 /* Parse the name string into X509_NAME struct. E.g. name_s =
  * "C=UK,O=ARM,CN=mbed TLS Server 1", split and add each entry into name. */
-static int _X509_parse_name(X509_NAME* name, const char* name_s)
+static oe_result_t _X509_parse_name(X509_NAME* name, const char* name_s)
 {
+    oe_result_t result = OE_CRYPTO_ERROR;
     char* key = NULL;
     char* val = NULL;
-    char* name_s_cpy = strdup(name_s);
+    char* name_s_cpy = NULL;
+    char* tmp = NULL;
 
+    name_s_cpy = strdup(name_s);
     if (!name_s_cpy)
-        return 0;
+        OE_RAISE(OE_CRYPTO_ERROR);
 
-    key = strsep(&name_s_cpy, "=");
+    tmp = name_s_cpy;
+    key = strsep(&tmp, "=");
     while (key != NULL)
     {
-        val = strsep(&name_s_cpy, ",");
+        val = strsep(&tmp, ",");
 
         if (!val)
-            return 0;
+            OE_RAISE(OE_CRYPTO_ERROR);
 
         X509_NAME_add_entry_by_txt(
             name, key, MBSTRING_ASC, (unsigned char*)val, -1, -1, 0);
 
-        key = strsep(&name_s_cpy, "=");
+        key = strsep(&tmp, "=");
     }
 
-    return 1;
+    result = OE_OK;
+
+done:
+    if (name_s_cpy)
+        free(name_s_cpy);
+
+    return result;
 }
 
 /* mbedTLS takes hex (encoded) form of oid for extension creation, but OpenSSL
@@ -1080,13 +1090,13 @@ oe_result_t oe_gen_custom_x509_cert(
     x509cert = X509_new();
     subject_issuer_key_pair = EVP_PKEY_new();
 
-    // Allocate buffer for certificate
+    /* Allocate buffer for certificate */
     if ((buff = malloc(cert_buf_size)) == NULL)
         OE_RAISE(OE_OUT_OF_MEMORY);
 
     /* Set certificate info */
 
-    // Parse public key
+    /* Parse public key */
     bio = BIO_new_mem_buf(
         (const void*)config->public_key_buf, (int)config->public_key_buf_size);
     if (bio == NULL)
@@ -1102,7 +1112,7 @@ oe_result_t oe_gen_custom_x509_cert(
     BIO_free(bio);
     bio = NULL;
 
-    // Parse private key
+    /* Parse private key */
     bio = BIO_new_mem_buf(
         (const void*)config->private_key_buf,
         (int)config->private_key_buf_size);
@@ -1115,34 +1125,30 @@ oe_result_t oe_gen_custom_x509_cert(
     BIO_free(bio);
     bio = NULL;
 
-    // Set version
+    /* Set version */
     ret = X509_set_version(x509cert, 2); // version 3
     if (!ret)
         OE_RAISE_MSG(OE_CRYPTO_ERROR, "set version failed");
 
-    // Set key
+    /* Set key */
     ret = X509_set_pubkey(x509cert, subject_issuer_key_pair);
     if (!ret)
         OE_RAISE_MSG(OE_CRYPTO_ERROR, "set pubkey failed");
 
-    // Set subject name
+    /* Set subject name */
     name = X509_get_subject_name(x509cert);
-    ret = _X509_parse_name(name, (const char*)config->subject_name);
-    if (!ret)
-        OE_RAISE_MSG(OE_CRYPTO_ERROR, "set subject name failed");
+    OE_CHECK(_X509_parse_name(name, (const char*)config->subject_name));
 
-    // Set issuer name
+    /* Set issuer name */
     name = X509_get_issuer_name(x509cert);
-    ret = _X509_parse_name(name, (const char*)config->issuer_name);
-    if (!ret)
-        OE_RAISE_MSG(OE_CRYPTO_ERROR, "set issuer name failed");
+    OE_CHECK(_X509_parse_name(name, (const char*)config->issuer_name));
 
-    // Set serial number
+    /* Set serial number */
     ret = ASN1_INTEGER_set(X509_get_serialNumber(x509cert), 1);
     if (!ret)
         OE_RAISE_MSG(OE_CRYPTO_ERROR, "set serial number failed");
 
-    // Set vadility date
+    /* Set vadility date */
     strcpy(date_str, (const char*)config->date_not_valid_before);
     strcat(date_str, "Z");
     ret = ASN1_TIME_set_string(X509_getm_notBefore(x509cert), date_str);
@@ -1158,7 +1164,7 @@ oe_result_t oe_gen_custom_x509_cert(
     /* Set extensions */
     data = ASN1_OCTET_STRING_new();
 
-    // Set basic constraints
+    /* Set basic constraints */
     bc = BASIC_CONSTRAINTS_new();
     bc->ca = false;
     bc->pathlen = 0;
@@ -1179,9 +1185,9 @@ oe_result_t oe_gen_custom_x509_cert(
     if (!ret)
         OE_RAISE_MSG(OE_CRYPTO_ERROR, "add basic constraint extension failed");
 
-    // SKI & AKI are not needed when CA = false
+    /* SKI & AKI are not needed when CA == false */
 
-    // Set custom extension
+    /* Set custom extension */
     ret = ASN1_OCTET_STRING_set(
         data,
         (const unsigned char*)config->ext_data_buf,
@@ -1208,14 +1214,16 @@ oe_result_t oe_gen_custom_x509_cert(
 
     /* Write certificate data */
 
-    // Sign the certificate
+    /* Sign the certificate */
     if (!X509_sign(x509cert, subject_issuer_key_pair, EVP_sha256()))
         OE_RAISE_MSG(OE_CRYPTO_ERROR, "sign cert failed");
 
-    // Write to DER
-    // The use of temporary variable is mandatory.
-    // If p is not NULL is writes the DER encoded data to the buffer at *p, and
-    // increments it to point after the data just written.
+    /*
+     * Write to DER
+     * The use of temporary variable is mandatory.
+     * If p is not NULL it writes the DER encoded data to the buffer at *p, and
+     * increments it to point after the data just written.
+     */
     p = buff;
     *bytes_written = (size_t)i2d_X509(x509cert, &p);
     if (*bytes_written <= 0)
@@ -1224,7 +1232,7 @@ oe_result_t oe_gen_custom_x509_cert(
             "bytes_written = 0x%x ",
             (unsigned int)*bytes_written);
 
-    // Copy DER data to buffer
+    /* Copy DER data to buffer */
     OE_CHECK(oe_memcpy_s(
         (void*)cert_buf, cert_buf_size, (const void*)buff, *bytes_written));
     OE_TRACE_VERBOSE("bytes_written = 0x%x", (unsigned int)*bytes_written);
@@ -1249,8 +1257,8 @@ done:
         free(buff);
     if (txt)
         free(txt);
-    if (ret)
-        result = OE_CRYPTO_ERROR;
+    if (str)
+        free(str);
 
     return result;
 }

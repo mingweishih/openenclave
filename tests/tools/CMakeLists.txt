@@ -3,6 +3,6 @@
 
 if (OE_SGX)
   add_subdirectory(oecert)
-  add_subdirectory(oecertdump)
+  #add_subdirectory(oecertdump)
   add_subdirectory(oesign)
 endif ()

@@ -200,7 +200,7 @@ oe_result_t oe_public_key_write_pem(
         if (*size < mem->length)
         {
             *size = mem->length;
-            OE_RAISE(OE_BUFFER_TOO_SMALL);
+            OE_RAISE_NO_TRACE(OE_BUFFER_TOO_SMALL);
         }
 
         /* Copy result to output buffer */
