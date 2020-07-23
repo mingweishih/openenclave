@@ -182,6 +182,12 @@ else ()
   if (NOT OE_BASH)
     message(FATAL_ERROR "Bash not found!")
   endif ()
+
+  find_program(OE_PERL perl)
+  if (NOT OE_PERL)
+    message(FATAL_ERROR "Perl not found!")
+  endif ()
+
 endif ()
 
 # See `cmake/enclave_cmake_wrappers.cmake` for wrapper functions.
