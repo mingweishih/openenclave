@@ -128,29 +128,34 @@ foreach (testcase ${openssltests})
     continue()
   endif ()
 
+  set(TEST_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test_data)
+  if (WIN32)
+    # Convert the "C:/" to "C/" so that the path can be used by hostfs on Windows.
+    string(REPLACE ":" "" TEST_DATA_DIR "${TEST_DATA_DIR}")
+  endif ()
   if ("${name}" STREQUAL evp_test)
     add_openssl_test("${name}-evpciph" "${name}"
-                     ${OPENSSL_TEST_DIR}/recipes/30-test_evp_data/evpciph.txt)
+                     ${TEST_DATA_DIR}/30-test_evp_data/evpciph.txt)
     add_openssl_test("${name}-evpdigest" "${name}"
-                     ${OPENSSL_TEST_DIR}/recipes/30-test_evp_data/evpdigest.txt)
+                     ${TEST_DATA_DIR}/30-test_evp_data/evpdigest.txt)
     add_openssl_test("${name}-evpencod" "${name}"
-                     ${OPENSSL_TEST_DIR}/recipes/30-test_evp_data/evpencod.txt)
+                     ${TEST_DATA_DIR}/30-test_evp_data/evpencod.txt)
     add_openssl_test("${name}-evpkdf" "${name}"
-                     ${OPENSSL_TEST_DIR}/recipes/30-test_evp_data/evpkdf.txt)
+                     ${TEST_DATA_DIR}/30-test_evp_data/evpkdf.txt)
     add_openssl_test("${name}-evpmac" "${name}"
-                     ${OPENSSL_TEST_DIR}/recipes/30-test_evp_data/evpmac.txt)
+                     ${TEST_DATA_DIR}/30-test_evp_data/evpmac.txt)
     add_openssl_test("${name}-evppbe" "${name}"
-                     ${OPENSSL_TEST_DIR}/recipes/30-test_evp_data/evppbe.txt)
+                     ${TEST_DATA_DIR}/30-test_evp_data/evppbe.txt)
     add_openssl_test("${name}-evppkey" "${name}"
-                     ${OPENSSL_TEST_DIR}/recipes/30-test_evp_data/evppkey.txt)
+                     ${TEST_DATA_DIR}/30-test_evp_data/evppkey.txt)
     add_openssl_test(
       "${name}-evppkey_ecc" "${name}"
-      ${OPENSSL_TEST_DIR}/recipes/30-test_evp_data/evppkey_ecc.txt)
+      ${TEST_DATA_DIR}/30-test_evp_data/evppkey_ecc.txt)
     add_openssl_test("${name}-evpcase" "${name}"
-                     ${OPENSSL_TEST_DIR}/recipes/30-test_evp_data/evpcase.txt)
+                     ${TEST_DATA_DIR}/30-test_evp_data/evpcase.txt)
     add_openssl_test(
       "${name}-evpccmcavs" "${name}"
-      ${OPENSSL_TEST_DIR}/recipes/30-test_evp_data/evpccmcavs.txt)
+      ${TEST_DATA_DIR}/30-test_evp_data/evpccmcavs.txt)
     continue()
   endif ()
 

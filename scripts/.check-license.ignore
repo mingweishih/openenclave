@@ -88,6 +88,7 @@ tests/str/test1\.txt
 tools/oesign/getopt\.h
 tools/oesign/getopt_long\.c
 tests/host_verify/data/.*
+tests/openssl/test_data/.*
 
 # The following files use the BSD license.
 scripts/lvi-mitigation/lvi-mitigation.py
