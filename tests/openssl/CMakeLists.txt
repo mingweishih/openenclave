@@ -2,13 +2,20 @@
 # Licensed under the MIT License.
 
 set(OPENSSL_DIR ${PROJECT_SOURCE_DIR}/3rdparty/openssl/openssl)
-set(OPENSSL_APPS_DIR ${OPENSSL_DIR}/apps)
-set(OPENSSL_TEST_DIR ${OPENSSL_DIR}/test)
 
 add_subdirectory(host)
 if (BUILD_ENCLAVES)
   add_subdirectory(enc)
 endif ()
+
+# The paths to the arguments used by the tests.
+set(OPENSSL_APPS_DIR ${OPENSSL_DIR}/apps)
+set(OPENSSL_TEST_DIR ${OPENSSL_DIR}/test)
+if (WIN32)
+  # Convert the "C:/" to "C/" so that the path can be used by hostfs on Windows.
+  string(REPLACE ":" "" OPENSSL_APPS_DIR "${OPENSSL_APPS_DIR}")
+  string(REPLACE ":" "" OPENSSL_TEST_DIR "${OPENSSL_TEST_DIR}")
+endif()
 
 # Add buildtests
 file(STRINGS "tests.supported.buildtest" buildtests)
@@ -306,6 +313,10 @@ foreach (testcase ${openssltests})
 
   if ("${name}" STREQUAL sslapitest)
     set(TMPFILE ${CMAKE_CURRENT_BINARY_DIR}/tmpfile)
+    if (WIN32)
+      # Convert the "C:/" to "C/" so that the path can be used by hostfs on Windows.
+      string(REPLACE ":" "" TMPFILE "${TMPFILE}")
+    endif ()
     add_openssl_test(
       "${name}" "${name}" ${OPENSSL_TEST_DIR}/certs
       ${OPENSSL_TEST_DIR}/recipes/90-test_sslapi_data/passwd.txt ${TMPFILE})

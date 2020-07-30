@@ -52,7 +52,7 @@ set(SSL_TEST_LIST
     "tls13ccstest")
 
 function (generate_buildtest TESTNAME)
-  set(GEN_BUILDTEST_PL ${OPENSSL_TEST_DIR}/generate_buildtest.pl)
+  set(GEN_BUILDTEST_PL ${OPENSSL_DIR}/test/generate_buildtest.pl)
   string(REPLACE "buildtest_" "" NAME "${TESTNAME}")
   add_custom_command(
     OUTPUT ${TESTNAME}.c
@@ -64,24 +64,24 @@ function (add_openssl_test_enc NAME BUILDTEST)
   if (BUILDTEST)
     list(APPEND TEST_SRC ${NAME}.c)
   else ()
-    list(APPEND TEST_SRC ${OPENSSL_TEST_DIR}/${NAME}.c)
+    list(APPEND TEST_SRC ${OPENSSL_DIR}/test/${NAME}.c)
   endif ()
 
   if ("${NAME}" IN_LIST SSL_TEST_LIST)
-    list(APPEND TEST_SRC ${OPENSSL_TEST_DIR}/ssltestlib.c)
+    list(APPEND TEST_SRC ${OPENSSL_DIR}/test/ssltestlib.c)
   endif ()
 
   if ("${NAME}" STREQUAL "drbg_cavs_test")
-    list(APPEND TEST_SRC ${OPENSSL_TEST_DIR}/drbg_cavs_data.c)
+    list(APPEND TEST_SRC ${OPENSSL_DIR}/test/drbg_cavs_data.c)
   endif ()
 
   if ("${NAME}" STREQUAL "ssl_test")
-    list(APPEND TEST_SRC ${OPENSSL_TEST_DIR}/handshake_helper.c
-         ${OPENSSL_TEST_DIR}/ssl_test_ctx.c)
+    list(APPEND TEST_SRC ${OPENSSL_DIR}/test/handshake_helper.c
+         ${OPENSSL_DIR}/test/ssl_test_ctx.c)
   endif ()
 
   if ("${NAME}" STREQUAL "ssl_test_ctx_test")
-    list(APPEND TEST_SRC ${OPENSSL_TEST_DIR}/ssl_test_ctx.c)
+    list(APPEND TEST_SRC ${OPENSSL_DIR}/test/ssl_test_ctx.c)
   endif ()
 
   add_enclave(
@@ -126,6 +126,54 @@ function (add_openssl_test_enc NAME BUILDTEST)
     oehostsock
     oehostfs
     oehostresolver)
+
+  if (WIN32)
+    maybe_build_using_clangw(openssl-${NAME}_enc)
+
+    # maybe_build_using_clangw populates variables in its parent scope (ie current scope)
+    # Propagate these variables back up to the caller.
+
+    # Propagate library names variables
+    set(CMAKE_STATIC_LIBRARY_PREFIX
+        "${CMAKE_STATIC_LIBRARY_PREFIX}"
+        PARENT_SCOPE)
+    set(CMAKE_STATIC_LIBRARY_SUFFIX
+        "${CMAKE_STATIC_LIBRARY_SUFFIX}"
+        PARENT_SCOPE)
+
+    # Propagate library tool variables
+    set(CMAKE_C_CREATE_STATIC_LIBRARY
+        "${CMAKE_C_CREATE_STATIC_LIBRARY}"
+        PARENT_SCOPE)
+    set(CMAKE_CXX_CREATE_STATIC_LIBRARY
+        "${CMAKE_CXX_CREATE_STATIC_LIBRARY}"
+        PARENT_SCOPE)
+
+    # Propagate linker variables
+    set(CMAKE_EXECUTABLE_SUFFIX
+        "${CMAKE_EXECUTABLE_SUFFIX}"
+        PARENT_SCOPE)
+    set(CMAKE_C_STANDARD_LIBRARIES
+        "${CMAKE_C_STANDARD_LIBRARIES}"
+        PARENT_SCOPE)
+    set(CMAKE_C_LINK_EXECUTABLE
+        "${CMAKE_C_LINK_EXECUTABLE}"
+        PARENT_SCOPE)
+    set(CMAKE_CXX_STANDARD_LIBRARIES
+        "${CMAKE_CXX_STANDARD_LIBRARIES}"
+        PARENT_SCOPE)
+    set(CMAKE_CXX_LINK_EXECUTABLE
+        "${CMAKE_CXX_LINK_EXECUTABLE}"
+        PARENT_SCOPE)
+
+    # Propagate cpmpiler variables
+    set(CMAKE_C_COMPILE_OBJECT
+        "${CMAKE_C_COMPILE_OBJECT}"
+        PARENT_SCOPE)
+    set(CMAKE_CXX_COMPILE_OBJECT
+        "${CMAKE_CXX_COMPILE_OBJECT}"
+        PARENT_SCOPE)
+  endif ()
 endfunction (add_openssl_test_enc)
 
 file(STRINGS "../tests.supported.buildtest" alltests)

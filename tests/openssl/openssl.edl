@@ -15,7 +15,7 @@ enclave {
         public int enc_test(
             int argc,
             [user_check] char** argv,
-            [user_check] char** environ);
+            [user_check] char** env);
     };
 
 };

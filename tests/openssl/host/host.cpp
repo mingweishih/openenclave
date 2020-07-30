@@ -9,12 +9,17 @@
 #include <string.h>
 #include "openssl_u.h"
 
+#ifdef __linux__
 extern char** environ;
+char** _environ = environ; // _environ is defined by stdlib.h on Windows.
+#endif
+
 void test(oe_enclave_t* enclave, int argc, char** argv)
 {
     int ret = 1;
+    char** env = _environ;
 
-    oe_result_t result = enc_test(enclave, &ret, argc, argv, environ);
+    oe_result_t result = enc_test(enclave, &ret, argc, argv, env);
     OE_TEST(result == OE_OK);
 
     if (ret == 0)
@@ -88,9 +93,6 @@ int main(int argc, char* argv[])
         fprintf(stderr, "Usage: %s ENCLAVE testname\n", argv[0]);
         exit(1);
     }
-
-    /* Disable stdout buffering on host. */
-    setbuf(stdout, NULL);
 
     printf("=== %s: %s %s\n", argv[0], argv[1], argv[2]);
 

@@ -11,13 +11,13 @@ extern char** __environ;
 
 extern int main(int argc, char* argv[]);
 
-int enc_test(int argc, char** argv, char** environ)
+int enc_test(int argc, char** argv, char** env)
 {
     int ret = 1;
     ENGINE* eng = NULL;
 
     /* Directly use environ from host. */
-    __environ = environ;
+    __environ = env;
 
     /* Initialize socket and host fs. */
     if (OE_OK != oe_load_module_host_socket_interface())
@@ -74,6 +74,6 @@ OE_SET_ENCLAVE_SGX(
     1,    /* ProductID */
     1,    /* SecurityVersion */
     true, /* AllowDebug */
-    8192, /* HeapPageCount */
+    1024, /* HeapPageCount */
     1024, /* StackPageCount */
     8);   /* TCSCount */
