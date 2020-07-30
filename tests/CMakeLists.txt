@@ -105,6 +105,7 @@ if (UNIX
     add_subdirectory(report)
     add_subdirectory(SampleApp)
     add_subdirectory(SampleAppCRT)
+    add_subdirectory(openssl)
     add_subdirectory(sealKey)
     add_subdirectory(sim-mode)
     add_subdirectory(stdc)

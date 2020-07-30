@@ -27,6 +27,7 @@ tests/libcxx/tests\..*$
 tests/libcxxrt/tests\..*$
 tests/libunwind/tests\..*$
 tests/mbed/tests\..*$
+tests/openssl/tests\..*$
 
 # Directories
 3rdparty/dlmalloc/dlmalloc/.*
