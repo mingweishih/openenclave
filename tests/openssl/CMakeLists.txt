@@ -137,12 +137,12 @@ foreach (testcase ${openssltests})
                      ${TEST_DATA_DIR}/30-test_evp_data/evpdigest.txt)
     add_openssl_test("${name}-evpencod" "${name}"
                      ${TEST_DATA_DIR}/30-test_evp_data/evpencod.txt)
-    add_openssl_test("${name}-evpkdf" "${name}"
-                     ${TEST_DATA_DIR}/30-test_evp_data/evpkdf.txt)
+    #add_openssl_test("${name}-evpkdf" "${name}"
+    #                 ${TEST_DATA_DIR}/30-test_evp_data/evpkdf.txt)
     add_openssl_test("${name}-evpmac" "${name}"
                      ${TEST_DATA_DIR}/30-test_evp_data/evpmac.txt)
-    add_openssl_test("${name}-evppbe" "${name}"
-                     ${TEST_DATA_DIR}/30-test_evp_data/evppbe.txt)
+    #add_openssl_test("${name}-evppbe" "${name}"
+    #                 ${TEST_DATA_DIR}/30-test_evp_data/evppbe.txt)
     add_openssl_test("${name}-evppkey" "${name}"
                      ${TEST_DATA_DIR}/30-test_evp_data/evppkey.txt)
     add_openssl_test(
