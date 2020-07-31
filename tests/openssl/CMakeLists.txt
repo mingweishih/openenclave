@@ -11,10 +11,12 @@ endif ()
 # The paths to the arguments used by the tests.
 set(OPENSSL_APPS_DIR ${OPENSSL_DIR}/apps)
 set(OPENSSL_TEST_DIR ${OPENSSL_DIR}/test)
+set(TEST_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test_data)
 if (WIN32)
   # Convert the "C:/" to "C/" so that the path can be used by hostfs on Windows.
   string(REPLACE ":" "" OPENSSL_APPS_DIR "${OPENSSL_APPS_DIR}")
   string(REPLACE ":" "" OPENSSL_TEST_DIR "${OPENSSL_TEST_DIR}")
+  string(REPLACE ":" "" TEST_DATA_DIR "${TEST_DATA_DIR}")
 endif()
 
 # Add buildtests
@@ -79,7 +81,7 @@ foreach (testcase ${openssltests})
       tests/openssl/${name}
       PROPERTIES
       ENVIRONMENT
-      "CTLOG_FILE=${OPENSSL_TEST_DIR}/ct/log_list.conf;CT_DIR=${OPENSSL_TEST_DIR}/ct;CERTS_DIR=${OPENSSL_TEST_DIR}/certs"
+      "CTLOG_FILE=${OPENSSL_TEST_DIR}/ct/log_list.conf;CT_DIR=${TEST_DATA_DIR}/ct;CERTS_DIR=${TEST_DATA_DIR}/certs"
     )
     continue()
   endif ()
@@ -128,11 +130,6 @@ foreach (testcase ${openssltests})
     continue()
   endif ()
 
-  set(TEST_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test_data)
-  if (WIN32)
-    # Convert the "C:/" to "C/" so that the path can be used by hostfs on Windows.
-    string(REPLACE ":" "" TEST_DATA_DIR "${TEST_DATA_DIR}")
-  endif ()
   if ("${name}" STREQUAL evp_test)
     add_openssl_test("${name}-evpciph" "${name}"
                      ${TEST_DATA_DIR}/30-test_evp_data/evpciph.txt)
