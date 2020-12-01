@@ -68,5 +68,6 @@ if (BUILD_OPENSSL)
   endif ()
 
   enclave_include_directories(crypto_openssl_enc PRIVATE
+                              ${CMAKE_CURRENT_SOURCE_DIR}
                               ${CMAKE_CURRENT_BINARY_DIR})
 endif ()
