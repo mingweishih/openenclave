@@ -31,7 +31,10 @@ set(ENCLAVE_CFLAGS_LIST
     -fstack-protector-strong
     -fno-omit-frame-pointer
     -ffunction-sections
-    -fdata-sections)
+    -fdata-sections
+    # Treat warnings as errors by default, which is consistent to the behavior
+    # of the clangw script.
+    -Werror)
 
 set(ENCLAVE_CFLAGS_CLANG_LIST ${ENCLAVE_CFLAGS_LIST}
                               ${SPECTRE_MITIGATION_FLAGS})
@@ -214,10 +217,15 @@ endfunction ()
 ##
 ##==============================================================================
 
-set(PACKAGE_CONFIG_FILES_LIST oehost-gcc.pc oehost-g++.pc
-                              oehost-clang.pc oehost-clang++.pc
-                              oeenclave-gcc.pc oeenclave-g++.pc
-                              oeenclave-clang.pc oeenclave-clang++.pc)
+set(PACKAGE_CONFIG_FILES_LIST
+    oehost-gcc.pc
+    oehost-g++.pc
+    oehost-clang.pc
+    oehost-clang++.pc
+    oeenclave-gcc.pc
+    oeenclave-g++.pc
+    oeenclave-clang.pc
+    oeenclave-clang++.pc)
 
 ##==============================================================================
 ##
@@ -236,8 +244,8 @@ set(LVI_MITIGATION_PACKAGE_CONFIG_FILES_LIST
 ##==============================================================================
 
 set(HOST_VERIFY_PACKAGE_CONFIG_FILES_LIST
-    oehostverify-gcc.pc oehostverify-g++.pc
-    oehostverify-clang.pc oehostverify-clang++.pc)
+    oehostverify-gcc.pc oehostverify-g++.pc oehostverify-clang.pc
+    oehostverify-clang++.pc)
 
 foreach (file_name ${PACKAGE_CONFIG_FILES_LIST})
   configure_and_install_pkg_config(${file_name} "")
