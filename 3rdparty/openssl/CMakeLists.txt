@@ -52,7 +52,12 @@ if (OE_SGX)
       ${OPENSSL_BUILD}/crypto/sha/sha1-x86_64.s
       ${OPENSSL_BUILD}/crypto/sha/sha256-mb-x86_64.s
       ${OPENSSL_BUILD}/crypto/sha/sha256-x86_64.s
-      ${OPENSSL_BUILD}/crypto/sha/sha512-x86_64.s)
+      ${OPENSSL_BUILD}/crypto/sha/sha512-x86_64.s
+      # Extra algothrims required by Rust
+      ${OPENSSL_BUILD}/crypto/chacha/chacha-x86_64.s
+      ${OPENSSL_BUILD}/crypto/poly1305/poly1305-x86_64.s
+      ${OPENSSL_BUILD}/crypto/rc4/rc4-md5-x86_64.s
+      ${OPENSSL_BUILD}/crypto/rc4/rc4-x86_64.s)
 
   set(PATCHED_ASM_SRC
       ${OPENSSL_BUILD}/crypto/aes/aesni-x86_64.s
@@ -268,6 +273,39 @@ ExternalProject_Add(
     ${CMAKE_COMMAND} -E env CC=${OPENSSL_C_COMPILER} ${OE_PERL}
     ${OPENSSL_BUILD}/crypto/sha/asm/sha512-x86_64.pl elf
     ${OPENSSL_BUILD}/crypto/sha/sha512-x86_64.s
+  # Extra crypto algorithms required by the Rust OpenSSL crate.
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${OPENSSL_BUILD}/crypto/chacha/asm
+  COMMAND
+    ${CMAKE_COMMAND} -E copy ${OPENSSL_DIR}/crypto/chacha/asm/chacha-x86_64.pl
+    ${OPENSSL_BUILD}/crypto/chacha/asm/chacha-x86_64.pl
+  COMMAND
+    ${CMAKE_COMMAND} -E env CC=${OPENSSL_C_COMPILER} ${OE_PERL}
+    ${OPENSSL_BUILD}/crypto/chacha/asm/chacha-x86_64.pl elf
+    ${OPENSSL_BUILD}/crypto/chacha/chacha-x86_64.s
+  COMMAND ${CMAKE_COMMAND} -E make_directory
+          ${OPENSSL_BUILD}/crypto/poly1305/asm
+  COMMAND
+    ${CMAKE_COMMAND} -E copy
+    ${OPENSSL_DIR}/crypto/poly1305/asm/poly1305-x86_64.pl
+    ${OPENSSL_BUILD}/crypto/poly1305/asm/poly1305-x86_64.pl
+  COMMAND
+    ${CMAKE_COMMAND} -E env CC=${OPENSSL_C_COMPILER} ${OE_PERL}
+    ${OPENSSL_BUILD}/crypto/poly1305/asm/poly1305-x86_64.pl elf
+    ${OPENSSL_BUILD}/crypto/poly1305/poly1305-x86_64.s
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${OPENSSL_BUILD}/crypto/rc4/asm
+  COMMAND
+    ${CMAKE_COMMAND} -E copy ${OPENSSL_DIR}/crypto/rc4/asm/rc4-md5-x86_64.pl
+    ${OPENSSL_BUILD}/crypto/rc4/asm/rc4-md5-x86_64.pl
+  COMMAND
+    ${CMAKE_COMMAND} -E env CC=${OPENSSL_C_COMPILER} ${OE_PERL}
+    ${OPENSSL_BUILD}/crypto/rc4/asm/rc4-md5-x86_64.pl elf
+    ${OPENSSL_BUILD}/crypto/rc4/rc4-md5-x86_64.s
+  COMMAND ${CMAKE_COMMAND} -E copy ${OPENSSL_DIR}/crypto/rc4/asm/rc4-x86_64.pl
+          ${OPENSSL_BUILD}/crypto/rc4/asm/rc4-x86_64.pl
+  COMMAND
+    ${CMAKE_COMMAND} -E env CC=${OPENSSL_C_COMPILER} ${OE_PERL}
+    ${OPENSSL_BUILD}/crypto/rc4/asm/rc4-x86_64.pl elf
+    ${OPENSSL_BUILD}/crypto/rc4/rc4-x86_64.s
   BUILD_BYPRODUCTS ${GENERATED_ASM_SRC}
   INSTALL_COMMAND "")
 
@@ -295,6 +333,10 @@ add_dependencies(openssl_includes openssl_configure)
 add_dependencies(openssl_copied openssl_configure)
 add_dependencies(openssl_generated openssl_includes)
 add_dependencies(openssl_generated openssl_copied)
+
+set(CRYPTO_EXTRAS
+    openssl/crypto/poly1305/poly1305.c openssl/crypto/poly1305/poly1305_ameth.c
+    openssl/crypto/poly1305/poly1305_pmeth.c)
 
 # Add opensslcrypto (the libcrypto in openssl).
 # Including the same set of files for building libcrypto.a based on the OpenSSL Makefile.
@@ -857,6 +899,7 @@ add_enclave_library(
   openssl/crypto/x509v3/v3_tlsf.c
   openssl/crypto/x509v3/v3_utl.c
   openssl/crypto/x509v3/v3err.c
+  ${CRYPTO_EXTRAS}
   ${GENERATED_ASM_SRC}
   ${PATCHED_ASM_SRC})
 
