@@ -48,6 +48,8 @@ static oe_result_t _unload_image(oe_enclave_image_t* image)
     if (image)
     {
         _unload_elf_image(&image->elf);
+        if (image->secondary)
+            _unload_elf_image(image->secondary);
         memset(image, 0, sizeof(*image));
     }
     return OE_OK;
@@ -452,6 +454,9 @@ static oe_result_t _calculate_size(
     size_t* image_size)
 {
     *image_size = image->elf.image_size + image->elf.reloc_size;
+    if (image->secondary)
+        *image_size +=
+            image->secondary->image_size + image->secondary->reloc_size;
     return OE_OK;
 }
 
@@ -620,6 +625,7 @@ static oe_result_t _add_elf_image_pages(
     const oe_enclave_elf_image_t* image,
     oe_sgx_load_context_t* context,
     oe_enclave_t* enclave,
+    uint64_t availabe_size,
     uint64_t* vaddr)
 {
     oe_result_t result = OE_UNEXPECTED;
@@ -627,9 +633,9 @@ static oe_result_t _add_elf_image_pages(
     assert(context);
     assert(enclave);
     assert(image);
-    assert(vaddr && (*vaddr == 0));
+    assert(vaddr);
     assert((image->image_size & (OE_PAGE_SIZE - 1)) == 0);
-    assert(enclave->size > image->image_size);
+    assert(availabe_size > image->image_size);
 
     /* Add the program segments first */
     OE_CHECK(_add_segment_pages(context, enclave->addr, image, vaddr));
@@ -650,7 +656,23 @@ static oe_result_t _add_pages(
     oe_enclave_t* enclave,
     uint64_t* vaddr)
 {
-    return _add_elf_image_pages(&image->elf, context, enclave, vaddr);
+    oe_result_t result = OE_UNEXPECTED;
+
+    assert(vaddr && (*vaddr == 0));
+    OE_CHECK(_add_elf_image_pages(
+        &image->elf, context, enclave, enclave->size, vaddr));
+
+    if (image->secondary)
+    {
+        size_t available_size = enclave->size - image->elf.image_size;
+        OE_CHECK(_add_elf_image_pages(
+            image->secondary, context, enclave, available_size, vaddr));
+    }
+
+    result = OE_OK;
+
+done:
+    return result;
 }
 
 static oe_result_t _get_dynamic_symbol_rva(
@@ -687,6 +709,96 @@ static oe_result_t _set_uint64_t_dynamic_symbol_value(
 
     symbol_address = (uint64_t*)(image->image_base + sym.st_value);
     *symbol_address = value;
+
+    result = OE_OK;
+done:
+    return result;
+}
+
+static oe_result_t _patch_secondary_elf_image(
+    oe_enclave_elf_image_t* primary_image,
+    oe_enclave_elf_image_t* image)
+{
+    oe_result_t result = OE_UNEXPECTED;
+    oe_sgx_enclave_properties_t* oeprops;
+
+    assert(primary_image);
+    assert(image);
+
+    oeprops =
+        (oe_sgx_enclave_properties_t*)(primary_image->image_base + primary_image->oeinfo_rva);
+
+    oeprops->image_info.heap_rva += image->image_size + image->reloc_size;
+
+    /* Clear certain ELF header fields */
+    for (size_t i = 0; i < image->num_segments; i++)
+    {
+        const oe_elf_segment_t* seg = &image->segments[i];
+        elf64_ehdr_t* ehdr = (elf64_ehdr_t*)(image->image_base + seg->vaddr);
+
+        if (elf64_test_header(ehdr) == 0)
+        {
+            ehdr->e_shoff = 0;
+            ehdr->e_shnum = 0;
+            ehdr->e_shstrndx = 0;
+            break;
+        }
+    }
+
+    OE_TRACE_INFO("Performing program linking\n");
+    // Iterate through relocations in first image.
+    elf64_rela_t* relocs = (elf64_rela_t*)primary_image->reloc_data;
+    uint64_t nrelocs = primary_image->reloc_size / sizeof(relocs[0]);
+    OE_TRACE_INFO("num relocs = %lu\n", nrelocs);
+
+    const elf64_sym_t* symtab = NULL;
+    size_t symtab_size = 0;
+    if (elf64_get_dynamic_symbol_table(
+            &primary_image->elf, &symtab, &symtab_size) != 0)
+        goto done;
+
+    uint64_t module_offset =
+        primary_image->image_size + primary_image->reloc_size;
+    OE_UNUSED(module_offset);
+    for (size_t i = 0; i < nrelocs; i++)
+    {
+        elf64_rela_t* p = &relocs[i];
+
+        /* If zero-padded bytes reached */
+        if (p->r_offset == 0)
+            break;
+
+        uint64_t sym_idx = ELF64_R_SYM(p->r_info);
+        uint64_t reloc_type = ELF64_R_TYPE(p->r_info);
+
+        /* Fix links to secondary module */
+        if (reloc_type == R_X86_64_GLOB_DAT)
+        {
+            const elf64_sym_t* sym = &symtab[sym_idx];
+            const char* name =
+                elf64_get_string_from_dynstr(&primary_image->elf, sym->st_name);
+            if (name == NULL)
+                OE_RAISE(OE_NOT_FOUND);
+
+            OE_TRACE_INFO("Linking symbol %s with idx  %lu", name, sym_idx);
+
+            // Find the definition of the symbol in secondary image.
+            elf64_sym_t sym_defn = {0};
+            if (elf64_find_dynamic_symbol_by_name(
+                    &image->elf, name, &sym_defn) == 0)
+            {
+                p->r_addend = (int64_t)(module_offset + sym_defn.st_value);
+                OE_TRACE_INFO(
+                    "%s vaddr=0x%lx, r_addend = 0xlx",
+                    sym_defn.st_value,
+                    p->r_addend);
+            }
+            else
+            {
+                OE_TRACE_INFO("symbol %s not found in secondary image\n", name);
+            }
+        }
+    }
 
     result = OE_OK;
 done:
@@ -782,6 +894,8 @@ static oe_result_t _patch(oe_enclave_image_t* image, size_t enclave_size)
 
     OE_CHECK(image->get_tls_page_count(image, &tls_page_count));
     OE_CHECK(_patch_elf_image(&image->elf, enclave_size, tls_page_count));
+    if (image->secondary)
+        OE_CHECK(_patch_secondary_elf_image(&image->elf, image->secondary));
 
     result = OE_OK;
 done:
@@ -832,6 +946,68 @@ done:
     return result;
 }
 
+static oe_result_t _load_secondary_module(
+    const char* path,
+    oe_enclave_image_t* image)
+{
+    oe_result_t result = OE_UNEXPECTED;
+    char* module_name = NULL;
+    size_t module_name_len = 0;
+    char* secondary_image_path = NULL;
+    oe_enclave_elf_image_t* secondary_image = NULL;
+
+    if (elf64_find_section(
+            &image->elf.elf,
+            "oemoduls",
+            (unsigned char**)&module_name,
+            &module_name_len) == 0)
+    {
+        OE_TRACE_VERBOSE("Enclave needs secondary modules");
+        OE_TRACE_INFO("module name = %s\n", module_name);
+
+        // Find out the folder from enclave path.
+        const char* p = path + strlen(path);
+        while (p != path && *p != '/' && *p != '\\')
+            --p;
+
+        // Allocate string to hold the seconday enclave path.
+        size_t len = (size_t)(p - path) + strlen(module_name) + 1;
+        secondary_image_path = calloc(1, len);
+        if (!secondary_image_path)
+            OE_RAISE(OE_OUT_OF_MEMORY);
+
+        sprintf(
+            secondary_image_path,
+            "%.*s/%s",
+            (int)(p - path),
+            path,
+            module_name);
+        OE_TRACE_INFO("module path = %s\n", secondary_image_path);
+        secondary_image =
+            (oe_enclave_elf_image_t*)calloc(1, sizeof(*secondary_image));
+        if (!secondary_image)
+            OE_RAISE(OE_OUT_OF_MEMORY);
+
+        OE_CHECK(_load_elf_image(secondary_image_path, secondary_image));
+
+        image->secondary = secondary_image;
+        secondary_image = NULL;
+    }
+    else
+    {
+        OE_TRACE_VERBOSE("Enclave does not specify secondary modules.");
+    }
+
+    result = OE_OK;
+done:
+    if (secondary_image_path)
+        free(secondary_image_path);
+    if (secondary_image)
+        free(secondary_image);
+
+    return result;
+}
+
 oe_result_t oe_load_elf_enclave_image(
     const char* path,
     oe_enclave_image_t* image)
@@ -842,6 +1018,9 @@ oe_result_t oe_load_elf_enclave_image(
 
     /* Load the program segments into memory */
     OE_CHECK(_load_elf_image(path, &image->elf));
+
+    /* Load secondary modules into memory */
+    OE_CHECK(_load_secondary_module(path, image));
 
     /* Verify that primary enclave image properties are found */
     if (!image->elf.entry_rva)
