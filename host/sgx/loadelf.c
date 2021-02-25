@@ -780,7 +780,7 @@ static oe_result_t _patch_secondary_elf_image(
             if (name == NULL)
                 OE_RAISE(OE_NOT_FOUND);
 
-            OE_TRACE_INFO("Linking symbol %s with idx  %lu", name, sym_idx);
+            OE_TRACE_INFO("Linking symbol %s with idx %lu", name, sym_idx);
 
             // Find the definition of the symbol in secondary image.
             elf64_sym_t sym_defn = {0};
@@ -946,62 +946,123 @@ done:
     return result;
 }
 
-static oe_result_t _load_secondary_module(
-    const char* path,
-    oe_enclave_image_t* image)
+typedef struct
 {
-    oe_result_t result = OE_UNEXPECTED;
-    char* module_name = NULL;
-    size_t module_name_len = 0;
-    char* secondary_image_path = NULL;
-    oe_enclave_elf_image_t* secondary_image = NULL;
+    elf64_sxword_t d_tag;
+    union {
+        elf64_xword_t d_val;
+        elf64_addr_t d_ptr;
+    } d_un;
+} elf64_dyn_t;
+
+#define DT_NEEDED 1
+#define DT_STRTAB 5
+#define DT_RPATH 15
+#define DT_RUNPATH 29
+
+static oe_result_t _find_secondary_module(
+    oe_enclave_image_t* image,
+    char** path)
+{
+    oe_result_t result = OE_OK;
+    elf64_dyn_t* data;
+    size_t size;
+
+    if (path)
+        *path = NULL;
 
     if (elf64_find_section(
-            &image->elf.elf,
-            "oemoduls",
-            (unsigned char**)&module_name,
-            &module_name_len) == 0)
+            &image->elf.elf, ".dynamic", (uint8_t**)&data, &size) != 0)
+        goto done;
+
+    unsigned long number_of_entries = size / sizeof(elf64_dyn_t);
+    elf64_addr_t strtab = 0;
+    elf64_xword_t name_offset = 0;
+    elf64_xword_t rpath_offset = 0;
+    elf64_xword_t runpath_offset = 0;
+
+    for (int i = 0; i < (int)number_of_entries; i++)
     {
-        OE_TRACE_VERBOSE("Enclave needs secondary modules");
-        OE_TRACE_INFO("module name = %s\n", module_name);
+        if (data[i].d_tag == DT_STRTAB)
+            strtab = data[i].d_un.d_ptr;
+        else if (data[i].d_tag == DT_RPATH)
+            rpath_offset = data[i].d_un.d_val;
+        else if (data[i].d_tag == DT_RUNPATH)
+            runpath_offset = data[i].d_un.d_val;
+        else if (data[i].d_tag == DT_NEEDED)
+            name_offset = data[i].d_un.d_val;
+    }
 
-        // Find out the folder from enclave path.
-        const char* p = path + strlen(path);
-        while (p != path && *p != '/' && *p != '\\')
-            --p;
+    // XXX: Can the offset be zero?
+    if (!strtab)
+    {
+        OE_TRACE_VERBOSE("DT_STRTAB tag not found.");
+        goto done;
+    }
 
-        // Allocate string to hold the seconday enclave path.
-        size_t len = (size_t)(p - path) + strlen(module_name) + 1;
-        secondary_image_path = calloc(1, len);
-        if (!secondary_image_path)
-            OE_RAISE(OE_OUT_OF_MEMORY);
+    // XXX: Can the offset be zero?
+    if (!name_offset)
+    {
+        OE_TRACE_VERBOSE("DT_NEEDED tag not found.");
+        goto done;
+    }
 
-        sprintf(
-            secondary_image_path,
-            "%.*s/%s",
-            (int)(p - path),
-            path,
-            module_name);
-        OE_TRACE_INFO("module path = %s\n", secondary_image_path);
+    char* module_name = (char*)(image->elf.image_base + strtab + name_offset);
+    char* prefix = NULL;
+    char* path_name = NULL;
+    size_t path_size = 0;
+
+    if (rpath_offset)
+        prefix = (char*)(image->elf.image_base + strtab + runpath_offset);
+
+    // RUNPATH takes precedence over RPATH.
+    if (runpath_offset)
+        prefix = (char*)(image->elf.image_base + strtab + runpath_offset);
+
+    // 1 for '/' and 1 for null.
+    path_size = strlen(module_name) + strlen(prefix) + 2;
+    path_name = calloc(1, path_size);
+    if (!path_name)
+        OE_RAISE(OE_OUT_OF_MEMORY);
+
+    snprintf(path_name, path_size, "%s/%s", prefix, module_name);
+
+    *path = path_name;
+
+done:
+    return result;
+}
+
+static oe_result_t _load_secondary_module(oe_enclave_image_t* image)
+{
+    oe_result_t result = OE_UNEXPECTED;
+    char* path = NULL;
+    oe_enclave_elf_image_t* secondary_image = NULL;
+
+    OE_CHECK(_find_secondary_module(image, &path));
+    if (path)
+    {
+        OE_TRACE_VERBOSE("Found a dependent secondary module");
+        OE_TRACE_INFO("module path = %s\n", path);
+
         secondary_image =
             (oe_enclave_elf_image_t*)calloc(1, sizeof(*secondary_image));
         if (!secondary_image)
             OE_RAISE(OE_OUT_OF_MEMORY);
 
-        OE_CHECK(_load_elf_image(secondary_image_path, secondary_image));
-
+        OE_CHECK(_load_elf_image(path, secondary_image));
         image->secondary = secondary_image;
         secondary_image = NULL;
     }
     else
     {
-        OE_TRACE_VERBOSE("Enclave does not specify secondary modules.");
+        OE_TRACE_VERBOSE("Dependent secondary module not found");
     }
 
     result = OE_OK;
 done:
-    if (secondary_image_path)
-        free(secondary_image_path);
+    if (path)
+        free(path);
     if (secondary_image)
         free(secondary_image);
 
@@ -1020,7 +1081,7 @@ oe_result_t oe_load_elf_enclave_image(
     OE_CHECK(_load_elf_image(path, &image->elf));
 
     /* Load secondary modules into memory */
-    OE_CHECK(_load_secondary_module(path, image));
+    OE_CHECK(_load_secondary_module(image));
 
     /* Verify that primary enclave image properties are found */
     if (!image->elf.entry_rva)
