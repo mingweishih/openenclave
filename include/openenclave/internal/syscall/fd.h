@@ -88,6 +88,12 @@ typedef struct _oe_socket_ops
         struct oe_sockaddr* addr,
         oe_socklen_t* addrlen);
 
+    oe_fd_t* (*accept4)(
+        oe_fd_t* sock,
+        struct oe_sockaddr* addr,
+        oe_socklen_t* addrlen,
+        int flags);
+
     int (*bind)(
         oe_fd_t* sock,
         const struct oe_sockaddr* addr,

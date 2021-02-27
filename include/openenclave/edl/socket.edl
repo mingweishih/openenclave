@@ -76,6 +76,14 @@ enclave
             [out, count=1] oe_socklen_t* addrlen_out)
             propagate_errno;
 
+        oe_host_fd_t oe_syscall_accept4_ocall(
+            oe_host_fd_t sockfd,
+            [out, size=addrlen_in] struct oe_sockaddr* addr,
+            oe_socklen_t addrlen_in,
+            [out, count=1] oe_socklen_t* addrlen_out,
+            int flags)
+            propagate_errno;
+
         int oe_syscall_bind_ocall(
             oe_host_fd_t sockfd,
             [in, size=addrlen] const struct oe_sockaddr* addr,

@@ -165,6 +165,12 @@ int oe_socketpair(int domain, int type, int protocol, int rtnfd[2]);
 
 int oe_accept(int sockfd, struct oe_sockaddr* addr, oe_socklen_t* addrlen);
 
+int oe_accept4(
+    int sockfd,
+    struct oe_sockaddr* addr,
+    oe_socklen_t* addrlen,
+    int flags);
+
 int oe_bind(int sockfd, const struct oe_sockaddr* addr, oe_socklen_t namelen);
 
 int oe_connect(

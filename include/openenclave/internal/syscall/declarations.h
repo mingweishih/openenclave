@@ -138,6 +138,9 @@ OE_EXTERNC_BEGIN
 
 OE_DECLARE_SYSCALL3_M(SYS_accept);
 #if __x86_64__ || _M_X64
+OE_DECLARE_SYSCALL4_M(SYS_accept4);
+#endif
+#if __x86_64__ || _M_X64
 OE_DECLARE_SYSCALL2(SYS_access);
 #endif
 OE_DECLARE_SYSCALL3_M(SYS_bind);

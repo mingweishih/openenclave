@@ -499,6 +499,7 @@ add_enclave_library(
   ${MUSLSRC}/network/gethostbyname.c
   ${MUSLSRC}/network/gethostbyname_r.c
   ${MUSLSRC}/network/accept.c
+  ${MUSLSRC}/network/accept4.c
   ${MUSLSRC}/network/bind.c
   ${MUSLSRC}/network/inet_pton.c
   ${MUSLSRC}/network/listen.c

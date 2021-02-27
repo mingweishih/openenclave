@@ -476,6 +476,27 @@ oe_host_fd_t oe_syscall_accept_ocall(
     return ret;
 }
 
+oe_host_fd_t oe_syscall_accept4_ocall(
+    oe_host_fd_t sockfd,
+    struct oe_sockaddr* addr,
+    oe_socklen_t addrlen_in,
+    oe_socklen_t* addrlen_out,
+    int flags)
+{
+    int ret;
+
+    errno = 0;
+
+    if ((ret = accept4(
+             (int)sockfd, (struct sockaddr*)addr, &addrlen_in, flags)) != -1)
+    {
+        if (addrlen_out)
+            *addrlen_out = addrlen_in;
+    }
+
+    return ret;
+}
+
 int oe_syscall_bind_ocall(
     oe_host_fd_t sockfd,
     const struct oe_sockaddr* addr,

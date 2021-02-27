@@ -295,6 +295,82 @@ done:
     return ret;
 }
 
+static oe_fd_t* _hostsock_accept4(
+    oe_fd_t* sock_,
+    struct oe_sockaddr* addr,
+    oe_socklen_t* addrlen,
+    int flags)
+{
+    oe_fd_t* ret = NULL;
+    sock_t* sock = _cast_sock(sock_);
+    sockaddr_t buf;
+    oe_socklen_t addrlen_in = 0;
+    sock_t* new_sock = NULL;
+
+    oe_errno = 0;
+
+    if (!sock || (addr && !addrlen) || (addrlen && !addr))
+        OE_RAISE_ERRNO(OE_EINVAL);
+
+    if (oe_memset_s(&buf, sizeof(buf), 0, sizeof(buf)) != OE_OK)
+        OE_RAISE_ERRNO(OE_EINVAL);
+
+    /* Fixup the address. */
+    if (addr && addrlen)
+    {
+        if (sizeof(buf) < *addrlen)
+            OE_RAISE_ERRNO_MSG(OE_EINVAL, "*addrlen=%u", *addrlen);
+
+        if (oe_memcpy_s(&buf, sizeof(buf), addr, *addrlen) != OE_OK)
+            OE_RAISE_ERRNO(OE_EINVAL);
+
+        addrlen_in = *addrlen;
+    }
+
+    /* Create the new socket. */
+    if (!(new_sock = _new_sock()))
+        OE_RAISE_ERRNO(OE_ENOMEM);
+
+    /* Call the host. */
+    {
+        oe_host_fd_t retval = -1;
+
+        if (oe_syscall_accept4_ocall(
+                &retval,
+                sock->host_fd,
+                addr ? &buf.addr : NULL,
+                addrlen_in,
+                addrlen,
+                flags) != OE_OK)
+        {
+            OE_RAISE_ERRNO(oe_errno);
+        }
+
+        if (retval == -1)
+            OE_RAISE_ERRNO_MSG(oe_errno, "retval=%d", retval);
+
+        new_sock->host_fd = retval;
+
+        // copy peer addr to out buffer
+        if (addrlen)
+        {
+            oe_assert(addr);
+            if (oe_memcpy_s(addr, addrlen_in, &buf.addr, *addrlen) != OE_OK)
+                OE_RAISE_ERRNO(OE_EINVAL);
+        }
+    }
+
+    ret = &new_sock->base;
+    new_sock = NULL;
+
+done:
+
+    if (new_sock)
+        oe_free(new_sock);
+
+    return ret;
+}
+
 static int _hostsock_bind(
     oe_fd_t* sock_,
     const struct oe_sockaddr* addr,
@@ -1230,6 +1306,7 @@ static oe_socket_ops_t _sock_ops = {
     .fd.get_host_fd = _hostsock_get_host_fd,
     .fd.close = _hostsock_close,
     .accept = _hostsock_accept,
+    .accept4 = _hostsock_accept4,
     .bind = _hostsock_bind,
     .listen = _hostsock_listen,
     .shutdown = _hostsock_shutdown,

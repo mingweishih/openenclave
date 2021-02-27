@@ -44,6 +44,16 @@ OE_WEAK OE_DEFINE_SYSCALL3_M(SYS_accept)
     return oe_accept(sockfd, addr, addrlen);
 }
 
+OE_WEAK OE_DEFINE_SYSCALL4_M(SYS_accept4)
+{
+    oe_errno = 0;
+    int sockfd = (int)arg1;
+    struct oe_sockaddr* addr = (struct oe_sockaddr*)arg2;
+    oe_socklen_t* addrlen = (oe_socklen_t*)arg3;
+    int flags = (int)arg4;
+    return oe_accept4(sockfd, addr, addrlen, flags);
+}
+
 #if __x86_64__ || _M_X64
 OE_WEAK OE_DEFINE_SYSCALL2(SYS_access)
 {
@@ -1112,6 +1122,9 @@ static long _syscall(
     switch (number)
     {
         OE_SYSCALL_DISPATCH(SYS_accept, arg1, arg2, arg3);
+#if __x86_64__ || _M_X64
+        OE_SYSCALL_DISPATCH(SYS_accept4, arg1, arg2, arg3, arg4);
+#endif
 #if __x86_64__ || _M_X64
         OE_SYSCALL_DISPATCH(SYS_access, arg1, arg2);
 #endif
