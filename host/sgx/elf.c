@@ -1845,8 +1845,9 @@ done:
     return result;
 }
 
-oe_result_t elf64_load_relocations(
+static oe_result_t _elf64_load_relocations(
     const elf64_t* elf,
+    const char* name,
     void** data_out,
     size_t* size_out)
 {
@@ -1860,17 +1861,8 @@ oe_result_t elf64_load_relocations(
     const elf64_sym_t* symtab = NULL;
     size_t symtab_size = 0;
 
-    if (data_out)
-        *data_out = 0;
-
-    if (size_out)
-        *size_out = 0;
-
-    if (!_is_valid_elf64(elf) || !data_out || !size_out)
-        goto done;
-
-    /* Get Shdr for the ".rela.dyn" section. */
-    index = _find_shdr(elf, ".rela.dyn");
+    /* Get Shdr for the ".rela.dyn" or ".rela.plt" section. */
+    index = _find_shdr(elf, name);
     if (index == (size_t)-1)
     {
         *data_out = NULL;
@@ -1913,7 +1905,8 @@ oe_result_t elf64_load_relocations(
          * we allow it for code that checks for the existence of weak symbols
          * before using them. */
         if (reloc_type != R_X86_64_RELATIVE && reloc_type != R_X86_64_TPOFF64 &&
-            reloc_type != R_X86_64_GLOB_DAT)
+            reloc_type != R_X86_64_GLOB_DAT && reloc_type != R_X86_64_64 &&
+            reloc_type != R_X86_64_JUMP_SLOT)
         {
             // Relocations are critical for correct code behavior.
             // Error out for unsupported relocations
@@ -1922,6 +1915,57 @@ oe_result_t elf64_load_relocations(
                 "Unsupported elf relocation type %d\n",
                 (int)reloc_type);
         }
+    }
+
+    *data_out = data;
+    *size_out = size;
+    result = OE_OK;
+
+done:
+    return result;
+}
+
+oe_result_t elf64_load_relocations(
+    const elf64_t* elf,
+    void** data_out,
+    size_t* size_out)
+{
+    oe_result_t result = OE_UNEXPECTED;
+    void* dyn_data = NULL;
+    size_t dyn_size = 0;
+    void* plt_data = NULL;
+    size_t plt_size = 0;
+    size_t size;
+    elf64_rela_t* p;
+    elf64_rela_t* end;
+    const elf64_sym_t* symtab = NULL;
+    size_t symtab_size = 0;
+
+    if (data_out)
+        *data_out = 0;
+
+    if (size_out)
+        *size_out = 0;
+
+    if (!_is_valid_elf64(elf) || !data_out || !size_out)
+        goto done;
+
+    OE_CHECK(_elf64_load_relocations(elf, ".rela.dyn", &dyn_data, &dyn_size));
+    OE_TRACE_INFO(
+        "Loaded section .rela.dyn at 0x%lx, size = %zu)\n",
+        (uint64_t)dyn_data,
+        dyn_size);
+    OE_CHECK(_elf64_load_relocations(elf, ".rela.plt", &plt_data, &plt_size));
+    OE_TRACE_INFO(
+        "Loaded section .rela.plt at 0x%lx, size = %zu)\n",
+        (uint64_t)plt_data,
+        plt_size);
+
+    size = dyn_size + plt_size;
+    if (!size)
+    {
+        result = OE_OK;
+        goto done;
     }
 
     /* Make a copy of the relocation section (zero-padded to page size) */
@@ -1935,7 +1979,13 @@ oe_result_t elf64_load_relocations(
         }
 
         memset(*data_out, 0, *size_out);
-        OE_CHECK(oe_memcpy_s(*data_out, *size_out, data, size));
+        OE_CHECK(oe_memcpy_s(*data_out, *size_out, dyn_data, dyn_size));
+        if (plt_data)
+            OE_CHECK(oe_memcpy_s(
+                (void*)((uint64_t)*data_out + dyn_size),
+                (*size_out) - dyn_size,
+                plt_data,
+                plt_size));
 
         // Fix up thread-local relocations.
         p = (elf64_rela_t*)*data_out;
@@ -1969,7 +2019,7 @@ oe_result_t elf64_load_relocations(
         }
     }
 
-    result = 0;
+    result = OE_OK;
 
 done:
     return result;

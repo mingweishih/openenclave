@@ -50,10 +50,44 @@ set(MUSL_SRC_DIR ${PROJECT_SOURCE_DIR}/3rdparty/musl/musl/src)
 if (OE_SGX)
   list(
     APPEND
-    PLATFORM_SRC
+    FREESTANDING_SRC
+    ${MUSL_SRC_DIR}/string/memcmp.c
     ${MUSL_SRC_DIR}/string/x86_64/memcpy.s
     ${MUSL_SRC_DIR}/string/x86_64/memmove.s
-    ${MUSL_SRC_DIR}/string/x86_64/memset.s
+    ${MUSL_SRC_DIR}/string/x86_64/memset.s)
+elseif (OE_TRUSTZONE)
+  list(APPEND FREESTANDING_SRC ${MUSL_SRC_DIR}/string/memcmp.c
+       ${MUSL_SRC_DIR}/string/memcpy.c ${MUSL_SRC_DIR}/string/memmove.c
+       ${MUSL_SRC_DIR}/string/memset.c)
+endif ()
+
+add_enclave_library(oefreestanding OBJECT ${FREESTANDING_SRC})
+
+maybe_build_using_clangw(oefreestanding)
+
+enclave_link_libraries(oefreestanding PRIVATE oe_includes)
+
+if (OE_SGX)
+  enclave_compile_options(
+    oefreestanding
+    PRIVATE
+    -ffreestanding
+    -fPIE
+    -nostdinc
+    -fvisibility=default
+    -fno-omit-frame-pointer
+    -ffunction-sections
+    -fdata-sections
+    -ftls-model=local-exec)
+elseif (OE_TRUSTZONE)
+  enclave_compile_options(oecore PUBLIC -ffreestanding -fvisibility=default
+                          ${OE_TZ_TA_C_FLAGS})
+endif ()
+
+if (OE_SGX)
+  list(
+    APPEND
+    PLATFORM_SRC
     ../../common/sgx/endorsements.c
     ../../common/sgx/rand.S
     ../../common/sgx/cpuid.c
@@ -156,7 +190,6 @@ add_enclave_library(
   ../../common/safecrt.c
   ../../common/argv.c
   ${MUSL_SRC_DIR}/prng/rand.c
-  ${MUSL_SRC_DIR}/string/memcmp.c
   __stack_chk_fail.c
   assert.c
   atexit.c
@@ -200,6 +233,9 @@ set_property(SOURCE ${NEEDS_STDC_NAMES} APPEND_STRING
 set_property(SOURCE ${NEEDS_STDC_NAMES} APPEND PROPERTY COMPILE_DEFINITIONS
                                                         OE_NEED_STDC_NAMES)
 
+set_property(SOURCE ${MUSL_SRC_DIR}/string/memcmp.c APPEND_STRING
+             PROPERTY COMPILE_FLAGS " -fvisibility=default ")
+
 maybe_build_using_clangw(oecore)
 
 add_enclave_dependencies(oecore core_trusted_edl)
@@ -209,7 +245,7 @@ endif ()
 
 enclave_include_directories(oecore PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
-enclave_link_libraries(oecore PUBLIC oe_includes)
+enclave_link_libraries(oecore PUBLIC oe_includes oefreestanding)
 if (OE_TRUSTZONE)
   enclave_link_libraries(oecore PUBLIC oelibutee_includes)
 
@@ -333,6 +369,7 @@ set_enclave_property(TARGET oecore PROPERTY ARCHIVE_OUTPUT_DIRECTORY
                      ${OE_LIBDIR}/openenclave/enclave)
 install_enclaves(
   TARGETS
+  oefreestanding
   oecore
   EXPORT
   openenclave-targets

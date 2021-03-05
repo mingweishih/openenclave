@@ -21,10 +21,7 @@ if (OE_SGX)
     ${MUSLSRC}/math/x86_64/sqrtl.s
     ${MUSLSRC}/math/x86_64/sqrtf.s
     ${MUSLSRC}/setjmp/x86_64/longjmp.s
-    ${MUSLSRC}/setjmp/x86_64/setjmp.s
-    ${MUSLSRC}/string/x86_64/memcpy.s
-    ${MUSLSRC}/string/x86_64/memmove.s
-    ${MUSLSRC}/string/x86_64/memset.s)
+    ${MUSLSRC}/setjmp/x86_64/setjmp.s)
 elseif (OE_TRUSTZONE)
   add_enclave_library(
     oelibasm
@@ -52,21 +49,13 @@ set(PLATFORM_SRC "")
 if (OE_SGX)
   list(APPEND PLATFORM_SRC sgx/arc4random.c)
 else ()
-  list(
-    APPEND
-    PLATFORM_SRC
-    ${MUSLSRC}/math/exp2l.c
-    ${MUSLSRC}/string/memcpy.c
-    ${MUSLSRC}/string/memmove.c
-    ${MUSLSRC}/string/memset.c
-    optee/abort.c
-    optee/arc4random.c
-    optee/trace.c)
+  list(APPEND PLATFORM_SRC ${MUSLSRC}/math/exp2l.c optee/abort.c
+       optee/arc4random.c optee/trace.c)
 endif ()
 
-add_enclave_library(
-  oelibc
-  STATIC
+list(
+  APPEND
+  LIBC_SOURCES
   atexit.c
   backtrace.c
   dladdr.c
@@ -689,7 +678,6 @@ add_enclave_library(
   ${MUSLSRC}/string/index.c
   ${MUSLSRC}/string/memccpy.c
   ${MUSLSRC}/string/memchr.c
-  ${MUSLSRC}/string/memcmp.c
   ${MUSLSRC}/string/memmem.c
   ${MUSLSRC}/string/mempcpy.c
   ${MUSLSRC}/string/memrchr.c
@@ -811,6 +799,15 @@ add_enclave_library(
   ${MUSLSRC}/unistd/usleep.c
   ${PLATFORM_SRC})
 
+# Free standing enviroment
+set(FREESTANDING_SORUCES ${MUSLSRC}/string/memcmp.c ${MUSLSRC}/string/memcpy.c
+                         ${MUSLSRC}/string/memmove.c ${MUSLSRC}/string/memset.c)
+
+add_enclave_library(
+  oelibc STATIC
+  #${FREESTANDING_SORUCES}
+  ${LIBC_SOURCES})
+
 maybe_build_using_clangw(oelibc)
 
 # NOTE: This is the minimum required for musl sources.
@@ -889,6 +886,9 @@ if (CODE_COVERAGE)
   # Link against libgcov.
   enclave_link_libraries(oelibc PRIVATE gcov)
 endif ()
+
+set_property(SOURCE ${MUSLSRC}/stdlib/qsort.c APPEND_STRING
+             PROPERTY COMPILE_FLAGS " -fvisibility=default ")
 
 # This project (and its dependents) require the enclave headers and
 # library, and the musl headers.

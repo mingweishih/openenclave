@@ -4,22 +4,29 @@
 #include <openenclave/enclave.h>
 #include <stdio.h>
 
-__attribute__((weak)) int foo(int a);
+//__attribute__((weak)) int foo(int a);
+int foo(int a);
 __attribute__((weak)) int add(int a, int b);
 __attribute__((weak)) int sub(int a, int b);
+int get_global();
+
+int h;
+
+__attribute__((constructor)) void init_h()
+{
+    h = 20;
+}
+
+__attribute__((destructor)) void fini_h()
+{
+    h = 0;
+}
 
 void enc_call_foo()
 {
-    if (foo)
-    {
-        printf("foo function defined in secondary module\n");
-        int value = foo(8);
-        printf("foo(8) = %d\n", value);
-    }
-    else
-    {
-        printf("foo not defined\n");
-    }
+    printf("foo function defined in secondary module\n");
+    int value = foo(8);
+    printf("foo(8) = %d\n", value);
 
     if (add)
     {
@@ -42,6 +49,9 @@ void enc_call_foo()
     {
         printf("sub not defined\n");
     }
+
+    printf("h: %d\n", h);
+    printf("global: %d\n", get_global());
 }
 
 OE_SET_ENCLAVE_SGX(

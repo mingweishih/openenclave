@@ -137,7 +137,9 @@ ELF_EXTERNC_BEGIN
 #define STT_HIPROC 15
 
 /* elf64_rel.r_info */
+#define R_X86_64_64 1
 #define R_X86_64_GLOB_DAT 6
+#define R_X86_64_JUMP_SLOT 7
 #define R_X86_64_RELATIVE 8
 
 /* Supported thread-local storage relocations */

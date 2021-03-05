@@ -39,8 +39,9 @@ struct _oe_enclave_elf_image
 {
     elf64_t elf;
 
-    char* image_base;  /* Base of the loaded segment contents */
-    size_t image_size; /* Size of all loaded segment contents */
+    char* image_base;   /* Base of the loaded segment contents */
+    uint64_t image_rva; /* RVA of the loaded segment contents */
+    size_t image_size;  /* Size of all loaded segment contents */
 
     /* Cached properties of loadable segments for enclave page add */
     oe_elf_segment_t* segments;

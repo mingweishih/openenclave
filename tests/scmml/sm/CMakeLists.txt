@@ -37,11 +37,10 @@ target_compile_options(
 
 target_link_libraries(
   sm
-  PRIVATE
-    -nostdlib
-    -nodefaultlibs
-    -nostartfiles
-    -Wl,--no-undefined,-Bstatic,-Bsymbolic,--export-dynamic,-pie,--build-id
-    -Wl,-z,noexecstack
-    -Wl,-z,now
-    -Wl,-gc-sections)
+  PRIVATE -nostdlib
+          -nodefaultlibs
+          -nostartfiles
+          -Wl,--no-undefined,-Bstatic,--export-dynamic,-pic,--build-id
+          -Wl,-z,noexecstack
+          -Wl,-z,now
+          -Wl,-gc-sections)
