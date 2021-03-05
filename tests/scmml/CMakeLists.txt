@@ -4,6 +4,7 @@
 add_subdirectory(host)
 
 if (BUILD_ENCLAVES)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/enc)
   add_subdirectory(sm)
   add_subdirectory(enc)
 endif ()

@@ -1858,10 +1858,8 @@ static oe_result_t _elf64_load_relocations(
     size_t size;
     elf64_rela_t* p;
     elf64_rela_t* end;
-    const elf64_sym_t* symtab = NULL;
-    size_t symtab_size = 0;
 
-    /* Get Shdr for the ".rela.dyn" or ".rela.plt" section. */
+    /* Get Shdr for the ".rela.dyn" or ".rela.plt" section */
     index = _find_shdr(elf, name);
     if (index == (size_t)-1)
     {
@@ -1871,7 +1869,7 @@ static oe_result_t _elf64_load_relocations(
         goto done;
     }
 
-    /* Check invalid indexes. */
+    /* Check invalid indexes */
     if (index == 0 || index >= _get_header(elf)->e_shnum)
         goto done;
 
@@ -1879,18 +1877,14 @@ static oe_result_t _elf64_load_relocations(
     if (shdr == NULL)
         goto done;
 
-    /* Sanity check for the entry size. */
+    /* Sanity check for the entry size */
     if (shdr->sh_entsize != sizeof(elf64_rela_t))
         goto done;
 
-    /* Get the relocation section. */
+    /* Get the relocation section */
     size = shdr->sh_size;
     data = _get_section(elf, index);
     if (data == NULL)
-        goto done;
-
-    /* Get pointer to symbol table */
-    if (elf64_get_dynamic_symbol_table(elf, &symtab, &symtab_size))
         goto done;
 
     /* Set pointers to start and end of relocation table */
@@ -1908,8 +1902,8 @@ static oe_result_t _elf64_load_relocations(
             reloc_type != R_X86_64_GLOB_DAT && reloc_type != R_X86_64_64 &&
             reloc_type != R_X86_64_JUMP_SLOT)
         {
-            // Relocations are critical for correct code behavior.
-            // Error out for unsupported relocations
+            /* Relocations are critical for correct code behavior.
+             * Error out for unsupported relocations */
             OE_RAISE_MSG(
                 OE_UNSUPPORTED_ENCLAVE_IMAGE,
                 "Unsupported elf relocation type %d\n",
@@ -1942,7 +1936,7 @@ oe_result_t elf64_load_relocations(
     size_t symtab_size = 0;
 
     if (data_out)
-        *data_out = 0;
+        *data_out = NULL;
 
     if (size_out)
         *size_out = 0;
@@ -1951,71 +1945,67 @@ oe_result_t elf64_load_relocations(
         goto done;
 
     OE_CHECK(_elf64_load_relocations(elf, ".rela.dyn", &dyn_data, &dyn_size));
-    OE_TRACE_INFO(
-        "Loaded section .rela.dyn at 0x%lx, size = %zu)\n",
-        (uint64_t)dyn_data,
-        dyn_size);
     OE_CHECK(_elf64_load_relocations(elf, ".rela.plt", &plt_data, &plt_size));
-    OE_TRACE_INFO(
-        "Loaded section .rela.plt at 0x%lx, size = %zu)\n",
-        (uint64_t)plt_data,
-        plt_size);
 
+    /* Ensure the size is not zero and the content of .rela.dyn is not empty */
     size = dyn_size + plt_size;
-    if (!size)
+    if (!size || !dyn_data)
     {
+        /* There is no relocation information. */
         result = OE_OK;
         goto done;
     }
 
     /* Make a copy of the relocation section (zero-padded to page size) */
+    *size_out = oe_round_up_to_page_size(size);
+
+    if (!(*data_out = oe_memalign(OE_PAGE_SIZE, *size_out)))
     {
-        *size_out = oe_round_up_to_page_size(size);
+        *size_out = 0;
+        goto done;
+    }
 
-        if (!(*data_out = oe_memalign(OE_PAGE_SIZE, *size_out)))
+    memset(*data_out, 0, *size_out);
+    OE_CHECK(oe_memcpy_s(*data_out, *size_out, dyn_data, dyn_size));
+    if (plt_data)
+        OE_CHECK(oe_memcpy_s(
+            (void*)((uint64_t)*data_out + dyn_size),
+            (*size_out) - dyn_size,
+            plt_data,
+            plt_size));
+
+    /* Get pointer to symbol table */
+    if (elf64_get_dynamic_symbol_table(elf, &symtab, &symtab_size))
+        goto done;
+
+    /* Fix up thread-local relocations */
+    p = (elf64_rela_t*)*data_out;
+    end = p + (size / sizeof(elf64_rela_t));
+
+    for (; p != end; p++)
+    {
+        if (ELF64_R_TYPE(p->r_info) == R_X86_64_TPOFF64)
         {
-            *size_out = 0;
-            goto done;
-        }
-
-        memset(*data_out, 0, *size_out);
-        OE_CHECK(oe_memcpy_s(*data_out, *size_out, dyn_data, dyn_size));
-        if (plt_data)
-            OE_CHECK(oe_memcpy_s(
-                (void*)((uint64_t)*data_out + dyn_size),
-                (*size_out) - dyn_size,
-                plt_data,
-                plt_size));
-
-        // Fix up thread-local relocations.
-        p = (elf64_rela_t*)*data_out;
-        end = p + (size / sizeof(elf64_rela_t));
-
-        for (; p != end; p++)
-        {
-            if (ELF64_R_TYPE(p->r_info) == R_X86_64_TPOFF64)
+            /* The symbol value contains the offset from the tls segment
+             * end. To avoid having symbol lookup in the enclave, we store
+             * the offset in the addend field. */
+            uint64_t sym_index = ELF64_R_SYM(p->r_info);
+            if (sym_index >= symtab_size)
             {
-                // The symbol value contains the offset from the tls segment
-                // end. To avoid having symbol lookup in the enclave, we store
-                // the offset in the addend field.
-                uint64_t sym_index = ELF64_R_SYM(p->r_info);
-                if (sym_index >= symtab_size)
-                {
-                    OE_RAISE_MSG(
-                        OE_UNSUPPORTED_ENCLAVE_IMAGE,
-                        "Invalid symtab index %d\n",
-                        (int)sym_index);
-                }
-                const elf64_sym_t* sym = &symtab[sym_index];
-                p->r_addend = (elf64_sxword_t)sym->st_value;
-
-                const char* sym_name =
-                    elf64_get_string_from_dynstr(elf, sym->st_name);
-                OE_TRACE_INFO(
-                    "Relocated thread-local variable %s with offset %d\n",
-                    sym_name ? sym_name : "",
-                    (int)p->r_addend);
+                OE_RAISE_MSG(
+                    OE_UNSUPPORTED_ENCLAVE_IMAGE,
+                    "Invalid symtab index %d\n",
+                    (int)sym_index);
             }
+            const elf64_sym_t* sym = &symtab[sym_index];
+            p->r_addend = (elf64_sxword_t)sym->st_value;
+
+            const char* sym_name =
+                elf64_get_string_from_dynstr(elf, sym->st_name);
+            OE_TRACE_INFO(
+                "Relocated thread-local variable %s with offset %d\n",
+                sym_name ? sym_name : "",
+                (int)p->r_addend);
         }
     }
 

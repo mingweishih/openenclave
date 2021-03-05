@@ -75,7 +75,8 @@ void oe_call_init_functions(void)
     const uint64_t baseaddr = (uint64_t)__oe_get_enclave_base();
     const oe_enclave_module_info_t* module_info = oe_get_module_info();
 
-    if (module_info->base_rva)
+    if (module_info->base_rva && module_info->init_array_rva &&
+        module_info->init_array_size)
     {
         uint64_t init_array_start = baseaddr + module_info->init_array_rva;
         uint64_t init_array_end = baseaddr + module_info->init_array_rva +
@@ -153,7 +154,8 @@ void oe_call_fini_functions(void)
 
     _call_fini_functions(&__fini_array_start, &__fini_array_end);
 
-    if (module_info->base_rva)
+    if (module_info->base_rva && module_info->fini_array_rva &&
+        module_info->fini_array_size)
     {
         uint64_t fini_array_start = baseaddr + module_info->fini_array_rva;
         uint64_t fini_array_end = baseaddr + module_info->fini_array_rva +

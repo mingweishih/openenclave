@@ -90,8 +90,8 @@ struct _oe_enclave_image
      * other enclave binary formats are supported later */
     oe_enclave_elf_image_t elf;
 
-    /* Pointer to the image of secondary module. */
-    oe_enclave_elf_image_t* secondary;
+    /* Pointer to the image of a module. */
+    oe_enclave_elf_image_t* module;
 
     /* Image type specific callbacks to handle enclave loading */
     oe_result_t (

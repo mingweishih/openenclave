@@ -273,13 +273,13 @@ uint64_t oe_get_num_pages(void)
 /*
 **==============================================================================
 **
-** Information for the secondary module.
+** Information for the module.
 **
 **==============================================================================
 */
-OE_EXPORT const oe_enclave_module_info_t _module_info;
+OE_EXPORT const volatile oe_enclave_module_info_t _module_info;
 
 const oe_enclave_module_info_t* oe_get_module_info(void)
 {
-    return &_module_info;
+    return (const oe_enclave_module_info_t*)&_module_info;
 }

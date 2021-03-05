@@ -29,7 +29,3 @@ int add(int a, int b)
 {
     return a + b + k;
 }
-
-void _start()
-{
-}

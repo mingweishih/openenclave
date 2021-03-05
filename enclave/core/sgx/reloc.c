@@ -28,7 +28,7 @@ bool oe_apply_relocations(void)
     {
         const elf64_rela_t* p = &relocs[i];
 
-        /* If zero-padded bytes reached */
+        /* Skip zero-padded bytes */
         if (p->r_offset == 0)
             continue;
 
@@ -38,12 +38,10 @@ bool oe_apply_relocations(void)
         uint64_t reloc_type = ELF64_R_TYPE(p->r_info);
 
         /* Relocate the reference */
-        if (reloc_type == R_X86_64_RELATIVE ||
-            reloc_type == R_X86_64_GLOB_DAT ||
-            reloc_type == R_X86_64_JUMP_SLOT || reloc_type == R_X86_64_64)
+        if (reloc_type == R_X86_64_RELATIVE)
         {
             int64_t addend = p->r_addend;
-            /* Skip if the symbol is not defined. */
+            /* Skip if the symbol is undefined. */
             if (addend)
                 *dest = (uint64_t)(baseaddr + p->r_addend);
         }
