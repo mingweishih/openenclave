@@ -56,6 +56,7 @@ if (OE_SGX)
     ${MUSL_SRC_DIR}/string/x86_64/memset.s
     ../../common/sgx/endorsements.c
     ../../common/sgx/rand.S
+    ../../common/sgx/rdtsc.S
     ../../common/sgx/cpuid.c
     sgx/arena.c
     sgx/asmdefs.c
@@ -193,19 +194,13 @@ list(APPEND NEEDS_STDC_NAMES ${MUSL_SRC_DIR}/prng/rand.c
 
 list(APPEND W_NO_CONVERSION ${MUSL_SRC_DIR}/prng/rand.c)
 
-set_property(
-  SOURCE ${W_NO_CONVERSION}
-  APPEND_STRING
-  PROPERTY COMPILE_FLAGS "-Wno-conversion")
+set_property(SOURCE ${W_NO_CONVERSION} APPEND_STRING PROPERTY COMPILE_FLAGS
+                                                              "-Wno-conversion")
 
-set_property(
-  SOURCE ${NEEDS_STDC_NAMES}
-  APPEND_STRING
-  PROPERTY COMPILE_FLAGS " -I${CORELIBC_INCLUDES}")
-set_property(
-  SOURCE ${NEEDS_STDC_NAMES}
-  APPEND
-  PROPERTY COMPILE_DEFINITIONS OE_NEED_STDC_NAMES)
+set_property(SOURCE ${NEEDS_STDC_NAMES} APPEND_STRING
+             PROPERTY COMPILE_FLAGS " -I${CORELIBC_INCLUDES}")
+set_property(SOURCE ${NEEDS_STDC_NAMES} APPEND PROPERTY COMPILE_DEFINITIONS
+                                                        OE_NEED_STDC_NAMES)
 
 maybe_build_using_clangw(oecore)
 

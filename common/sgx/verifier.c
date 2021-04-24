@@ -10,6 +10,7 @@
 #include <openenclave/internal/report.h>
 #include <openenclave/internal/safemath.h>
 #include <openenclave/internal/sgx/plugin.h>
+#include <openenclave/internal/time.h>
 
 #include "../attest_plugin.h"
 #include "../common.h"
@@ -230,6 +231,8 @@ static oe_result_t _fill_with_known_claims(
     const sgx_report_body_t* sgx_report_body = NULL;
     size_t claims_index = 0;
     bool flag;
+
+    RECORD_TSC();
 
     if (claims_length < OE_REQUIRED_CLAIMS_COUNT + OE_SGX_REQUIRED_CLAIMS_COUNT)
         OE_RAISE(OE_INVALID_PARAMETER);
@@ -473,6 +476,8 @@ static oe_result_t _fill_with_known_claims(
             sgx_endorsements->items[OE_SGX_ENDORSEMENT_FIELD_QE_ID_ISSUER_CHAIN]
                 .size));
     }
+
+    RECORD_TSC();
 
     *claims_added = claims_index;
     result = OE_OK;

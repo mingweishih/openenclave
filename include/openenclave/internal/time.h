@@ -36,6 +36,25 @@ uint64_t oe_get_time(void);
 int gettimeofday(struct timeval* tv, struct timezone* tz);
 #endif
 
+typedef struct _oe_debug_location_t
+{
+    const char* file;
+    int line;
+    const char* function;
+} oe_debug_location_t;
+
+uint64_t oe_rdtsc();
+void record_tsc(const char* file, int line, const char* function);
+void get_timestamps(uint64_t** array, int* count);
+void reset_timestamps(void);
+oe_debug_location_t* get_location_by_index(int index);
+
+#define RECORD_TSC()                                  \
+    do                                                \
+    {                                                 \
+        record_tsc(__FILE__, __LINE__, __FUNCTION__); \
+    } while (0)
+
 OE_EXTERNC_END
 
 #endif /* _OE_INCLUDE_TIME_H */
