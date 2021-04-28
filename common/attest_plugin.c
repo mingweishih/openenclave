@@ -13,6 +13,7 @@
 #include <openenclave/internal/report.h>
 #include <openenclave/internal/safecrt.h>
 #include <openenclave/internal/safemath.h>
+#include <openenclave/internal/time.h>
 #include <openenclave/internal/utils.h>
 #include <stdio.h>
 #include <string.h>
@@ -386,6 +387,8 @@ oe_result_t oe_verify_evidence(
     if (plugin_node == NULL)
         OE_RAISE(OE_NOT_FOUND);
 
+    RECORD_TSC();
+
     verifier = (oe_verifier_t*)plugin_node->plugin;
     OE_CHECK(verifier->verify_evidence(
         verifier,
@@ -397,6 +400,8 @@ oe_result_t oe_verify_evidence(
         policies_size,
         claims,
         claims_length));
+
+    RECORD_TSC();
 
     if (claims && claims_length && !_check_claims(*claims, *claims_length))
     {

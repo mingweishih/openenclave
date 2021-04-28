@@ -12,6 +12,7 @@
 #include <openenclave/internal/report.h>
 #include <openenclave/internal/sgxcertextensions.h>
 #include <openenclave/internal/tests.h>
+#include <openenclave/internal/time.h>
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
@@ -39,6 +40,12 @@ extern FILE* log_file;
 #define OE_PEM_END_CERTIFICATE_LEN (sizeof(OE_PEM_END_CERTIFICATE) - 1)
 #define SGX_EXTENSION_OID_STR "1.2.840.113741.1.13.1"
 #define MAX_BUFFER_SIZE 65536
+
+static double tsc_to_ms(uint64_t t)
+{
+    const uint64_t cpu_frequency = 2793436000;
+    return (double)t / cpu_frequency * 1000;
+}
 
 void log(const char* fmt, ...)
 {
@@ -889,7 +896,10 @@ oe_result_t generate_oe_evidence(
         const oe_claim_t* claim;
 
         OE_CHECK(oe_verifier_initialize());
+        reset_timestamps();
 
+        uint64_t t1, t2;
+        t1 = oe_rdtsc();
         OE_CHECK_MSG(
             oe_verify_evidence(
                 NULL,
@@ -904,6 +914,103 @@ oe_result_t generate_oe_evidence(
             "Failed to verify evidence. result=%u (%s)\n",
             result,
             oe_result_str(result));
+        t2 = oe_rdtsc();
+
+        uint64_t* data;
+        int count;
+        get_timestamps(&data, &count);
+
+        printf("[host] oe_verify_evidence: %lf ms\n", tsc_to_ms(t2 - t1));
+        for (int i = 0; i <= count; i++)
+        {
+            uint64_t start, end;
+            oe_debug_location_t* loc;
+            if (i != count)
+                loc = get_location_by_index(i);
+
+            if (i == 0)
+            {
+                start = t1;
+                end = data[i];
+                printf(
+                    "%s:%d::%s:%lf ms\n",
+                    loc->file,
+                    loc->line,
+                    loc->function,
+                    tsc_to_ms(end - start));
+            }
+            else if (i == count)
+            {
+                start = data[i - 1];
+                end = t2;
+                printf("return: %lf ms \n", tsc_to_ms(end - start));
+            }
+            else
+            {
+                start = data[i - 1];
+                end = data[i];
+                printf(
+                    "%s:%d::%s:%lf ms\n",
+                    loc->file,
+                    loc->line,
+                    loc->function,
+                    tsc_to_ms(end - start));
+            }
+        }
+
+        {
+            uint64_t t1, t2;
+            test_verifier_init(enclave);
+            t1 = oe_rdtsc();
+            test_verify_evidence(
+                enclave,
+                evidence,
+                evidence_size,
+                endorsements,
+                endorsements_size);
+            t2 = oe_rdtsc();
+
+            timestamps_t tscs;
+            enc_get_timestamps(enclave, &tscs);
+            printf("[enc] oe_verify_evidence: %lf ms\n", tsc_to_ms(t2 - t1));
+
+            for (int i = 0; i <= (int)tscs.count; i++)
+            {
+                uint64_t start, end;
+                location_t loc;
+                if (i != (int)tscs.count)
+                    enc_get_location(enclave, i, &loc);
+
+                if (i == 0)
+                {
+                    start = t1;
+                    end = tscs.data[i];
+                    printf(
+                        "%s:%d::%s:%lf ms\n",
+                        loc.file,
+                        loc.line,
+                        loc.function,
+                        tsc_to_ms(end - start));
+                }
+                else if (i == (int)tscs.count)
+                {
+                    start = tscs.data[i - 1];
+                    end = t2;
+                    printf("return: %lf ms \n", tsc_to_ms(end - start));
+                }
+                else
+                {
+                    start = tscs.data[i - 1];
+                    end = tscs.data[i];
+                    printf(
+                        "%s:%d::%s:%lf ms\n",
+                        loc.file,
+                        loc.line,
+                        loc.function,
+                        tsc_to_ms(end - start));
+                }
+            }
+        }
 
         // verify signer id
         claim = find_claim(claims, claims_length, OE_CLAIM_SIGNER_ID);

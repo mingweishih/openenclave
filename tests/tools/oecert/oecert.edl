@@ -11,6 +11,21 @@ enclave {
     from "openenclave/edl/optee/platform.edl" import *;
 #endif
 
+    struct timestamps_t
+    {
+        [count=count] uint64_t* data;
+        size_t count;
+    };
+
+    struct location_t
+    {
+        [size=file_size] char* file;
+        size_t file_size;
+        int line;
+        [size=function_size] char* function;
+        size_t function_size;
+    };
+
     trusted {
         public oe_result_t get_tls_cert_signed_with_key(
             [in, count=private_key_size] uint8_t *private_key,
@@ -28,5 +43,11 @@ enclave {
           size_t endorsements_size,
           [out] size_t* endorsements_out_size
         );
+
+        public void test_verifier_init();
+        public void test_verify_evidence([in, size=evidence_size] uint8_t* evidence, size_t evidence_size,
+                                         [in, size=endorsements_size] uint8_t* endorsements, size_t endorsements_size);
+        public void enc_get_timestamps([out, count=1] timestamps_t* tscs);
+        public void enc_get_location(int index, [out, count=1] location_t* loc);
     };
 };

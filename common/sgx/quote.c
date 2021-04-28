@@ -9,6 +9,7 @@
 #include <openenclave/internal/datetime.h>
 #include <openenclave/internal/raise.h>
 #include <openenclave/internal/safecrt.h>
+#include <openenclave/internal/time.h>
 #include <openenclave/internal/trace.h>
 #include <openenclave/internal/utils.h>
 #include "../common.h"
@@ -604,6 +605,7 @@ oe_result_t oe_verify_quote_with_sgx_endorsements(
         result = OE_OK;
     }
 
+    RECORD_TSC();
     // DCAP QVL doesn't exist or system env `SGX_DCAP_QVL` doesn't set
     if (result == OE_PLATFORM_ERROR)
     {
@@ -612,6 +614,7 @@ oe_result_t oe_verify_quote_with_sgx_endorsements(
             "Failed to verify remote quote.",
             NULL);
     }
+    RECORD_TSC();
 
     OE_CHECK_MSG(
         oe_get_sgx_quote_validity(
@@ -622,6 +625,8 @@ oe_result_t oe_verify_quote_with_sgx_endorsements(
             &validity_until),
         "Failed to validate quote. %s",
         oe_result_str(result));
+
+    RECORD_TSC();
 
     if (oe_datetime_compare(&validation_time, &validity_from) < 0)
     {
@@ -664,6 +669,8 @@ oe_result_t oe_verify_quote_with_sgx_endorsements(
     }
     result = OE_OK;
 
+    RECORD_TSC();
+
 done:
 
     return result;
@@ -702,6 +709,7 @@ oe_result_t oe_get_sgx_quote_validity(
 
     OE_TRACE_INFO("Call enter %s\n", __FUNCTION__);
 
+    RECORD_TSC();
     OE_CHECK_MSG(
         _parse_quote(
             quote,
@@ -716,6 +724,7 @@ oe_result_t oe_get_sgx_quote_validity(
     pem_pck_certificate = qe_cert_data.data;
     pem_pck_certificate_size = qe_cert_data.size;
 
+    RECORD_TSC();
     OE_CHECK_MSG(
         oe_get_quote_cert_chain_internal(
             quote,
@@ -725,6 +734,7 @@ oe_result_t oe_get_sgx_quote_validity(
             &pck_cert_chain),
         "Failed to retreive PCK cert chain. %s",
         oe_result_str(result));
+    RECORD_TSC();
 
     // Fetch certificates.
     OE_CHECK_MSG(
@@ -758,13 +768,16 @@ oe_result_t oe_get_sgx_quote_validity(
     _update_validity(&latest_from, &earliest_until, &from, &until);
 
     // Fetch revocation info validity dates.
+    RECORD_TSC();
     OE_CHECK_MSG(
         oe_validate_revocation_list(&pck_cert, sgx_endorsements, &from, &until),
 
         "Failed to validate revocation info. %s",
         oe_result_str(result));
+    RECORD_TSC();
     _update_validity(&latest_from, &earliest_until, &from, &until);
 
+    RECORD_TSC();
     // QE identity info validity dates.
     OE_CHECK_MSG(
         oe_validate_qe_identity(
@@ -772,6 +785,7 @@ oe_result_t oe_get_sgx_quote_validity(
 
         "Failed quoting enclave identity checking. %s",
         oe_result_str(result));
+    RECORD_TSC();
     _update_validity(&latest_from, &earliest_until, &from, &until);
 
     oe_datetime_log("Quote overall issue date: ", &latest_from);

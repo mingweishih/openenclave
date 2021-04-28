@@ -89,6 +89,7 @@ list(
   PLATFORM_HOST_MR_SRC
   ${PROJECT_SOURCE_DIR}/common/safecrt.c
   ${PROJECT_SOURCE_DIR}/common/sha.c
+  ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.S
   hexdump.c
   dupenv.c
   fopen.c

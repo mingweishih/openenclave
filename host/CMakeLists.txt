@@ -255,6 +255,7 @@ if (OE_SGX)
     list(
       APPEND
       PLATFORM_SDK_ONLY_SRC
+      ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.S
       sgx/linux/aep.S
       sgx/enter.c
       sgx/linux/exception.c
@@ -314,6 +315,7 @@ list(
   ${PROJECT_SOURCE_DIR}/common/datetime.c
   ${PROJECT_SOURCE_DIR}/common/safecrt.c
   ${PROJECT_SOURCE_DIR}/common/sha.c
+  ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.S
   memalign.c
   hexdump.c
   dupenv.c

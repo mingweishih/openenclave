@@ -3,11 +3,13 @@
 
 #include <openenclave/attestation/attester.h>
 #include <openenclave/attestation/sgx/evidence.h>
+#include <openenclave/attestation/verifier.h>
 #include <openenclave/edger8r/enclave.h>
 #include <openenclave/enclave.h>
 #include <openenclave/internal/raise.h>
 #include <openenclave/internal/report.h>
 #include <openenclave/internal/safecrt.h>
+#include <openenclave/internal/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -171,6 +173,76 @@ done:
         oe_free_endorsements(local_endorsements);
 
     return result;
+}
+
+void test_verifier_init()
+{
+    oe_result_t result = OE_UNEXPECTED;
+    OE_CHECK(oe_verifier_initialize());
+    reset_timestamps();
+done:
+    return;
+}
+
+void test_verify_evidence(
+    uint8_t* evidence,
+    size_t evidence_size,
+    uint8_t* endorsements,
+    size_t endorsements_size)
+{
+    oe_result_t result = OE_UNEXPECTED;
+    oe_claim_t* claims = NULL;
+    size_t claims_length = 0;
+
+    RECORD_TSC();
+    OE_CHECK_MSG(
+        oe_verify_evidence(
+            NULL,
+            evidence,
+            evidence_size,
+            endorsements,
+            endorsements_size,
+            NULL,
+            0,
+            &claims,
+            &claims_length),
+        "Failed to verify evidence. result=%u (%s)\n",
+        result,
+        oe_result_str(result));
+    RECORD_TSC();
+
+done:
+    return;
+}
+
+void enc_get_timestamps(timestamps_t* tscs)
+{
+    uint64_t* data;
+    int count;
+    size_t size;
+    get_timestamps(&data, &count);
+
+    size = (size_t)count * sizeof(uint64_t);
+    tscs->data = (uint64_t*)malloc(size);
+    memcpy(tscs->data, data, size);
+    tscs->count = (size_t)count;
+}
+
+void enc_get_location(int index, location_t* loc)
+{
+    oe_debug_location_t* location = get_location_by_index(index);
+    size_t file_size = strlen(location->file);
+    size_t function_size = strlen(location->function);
+
+    loc->file = (char*)malloc(file_size + 1);
+    memcpy(loc->file, location->file, file_size);
+    loc->file[file_size] = '\0';
+    loc->file_size = file_size + 1;
+    loc->line = location->line;
+    loc->function = (char*)malloc(function_size + 1);
+    memcpy(loc->function, location->function, function_size);
+    loc->function[function_size] = '\0';
+    loc->function_size = function_size + 1;
 }
 
 OE_SET_ENCLAVE_SGX(
