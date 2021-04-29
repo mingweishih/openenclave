@@ -55,6 +55,7 @@ if (OE_SGX)
     ${MUSL_SRC_DIR}/string/x86_64/memmove.s
     ${MUSL_SRC_DIR}/string/x86_64/memset.s
     ../../common/sgx/endorsements.c
+    ../../common/sgx/debugtsc.c
     ../../common/sgx/rand.S
     ../../common/sgx/rdtsc.S
     ../../common/sgx/cpuid.c

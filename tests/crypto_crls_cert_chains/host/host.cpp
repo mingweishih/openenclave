@@ -4,12 +4,19 @@
 #include <openenclave/host.h>
 #include <openenclave/internal/error.h>
 #include <openenclave/internal/tests.h>
+#include <openenclave/internal/time.h>
 #include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
 #include "../common/tests.cpp"
 #include "crypto_crls_cert_chains_u.h"
+
+static double tsc_to_ms(uint64_t t)
+{
+    const uint64_t cpu_frequency = 2793436000;
+    return (double)t / cpu_frequency * 1000;
+}
 
 std::string read_text_file(const char* path)
 {
@@ -80,6 +87,9 @@ void run_crl_tests(oe_enclave_t* enclave)
     std::vector<char> intermediate_crl2 =
         read_binary_file("./data/intermediate_crl2.der");
 
+    uint64_t t1, t2;
+
+    t1 = oe_rdtsc();
     test_crls(
         root.c_str(),
         intermediate.c_str(),
@@ -93,7 +103,10 @@ void run_crl_tests(oe_enclave_t* enclave)
         intermediate_crl1.size(),
         reinterpret_cast<uint8_t*>(intermediate_crl2.data()),
         intermediate_crl2.size());
+    t2 = oe_rdtsc();
+    printf("[host] test_crls: %lf ms\n", tsc_to_ms(t2 - t1));
 
+    t1 = oe_rdtsc();
     oe_result_t result = ecall_test_crls(
         enclave,
         root.c_str(),
@@ -108,6 +121,8 @@ void run_crl_tests(oe_enclave_t* enclave)
         intermediate_crl1.size(),
         intermediate_crl2.data(),
         intermediate_crl2.size());
+    t2 = oe_rdtsc();
+    printf("[enclave] test_crls: %lf ms\n", tsc_to_ms(t2 - t1));
     OE_TEST(OE_OK == result);
 }
 

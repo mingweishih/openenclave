@@ -256,6 +256,7 @@ if (OE_SGX)
       APPEND
       PLATFORM_SDK_ONLY_SRC
       ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.S
+      ${PROJECT_SOURCE_DIR}/common/sgx/debugtsc.c
       sgx/linux/aep.S
       sgx/enter.c
       sgx/linux/exception.c
@@ -315,6 +316,7 @@ list(
   ${PROJECT_SOURCE_DIR}/common/datetime.c
   ${PROJECT_SOURCE_DIR}/common/safecrt.c
   ${PROJECT_SOURCE_DIR}/common/sha.c
+  ${PROJECT_SOURCE_DIR}/common/sgx/debugtsc.c
   ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.S
   memalign.c
   hexdump.c
