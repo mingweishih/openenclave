@@ -4,6 +4,7 @@
 # Add a library oehostmr independent of libsgx_enclave_common/libsgx_dcap_ql
 if (UNIX)
   set(PLATFORM_HOST_MR_SRC
+      ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.S
       ${PROJECT_SOURCE_DIR}/common/crypto/openssl/asn1.c
       ${PROJECT_SOURCE_DIR}/common/crypto/openssl/cert.c
       ${PROJECT_SOURCE_DIR}/common/crypto/openssl/ec.c
@@ -16,6 +17,7 @@ if (UNIX)
       linux/time.c)
 elseif (WIN32)
   set(PLATFORM_HOST_MR_SRC
+      ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.asm
       crypto/bcrypt/key.c
       crypto/bcrypt/rsa.c
       crypto/bcrypt/sha.c
@@ -48,6 +50,7 @@ if (OE_SGX)
     APPEND
     PLATFORM_HOST_MR_SRC
     signkey.c
+    ${PROJECT_SOURCE_DIR}/common/sgx/debugtsc.c
     ${PROJECT_SOURCE_DIR}/common/sgx/sgxmeasure.c
     sgx/create.c
     sgx/elf.c
@@ -89,7 +92,6 @@ list(
   PLATFORM_HOST_MR_SRC
   ${PROJECT_SOURCE_DIR}/common/safecrt.c
   ${PROJECT_SOURCE_DIR}/common/sha.c
-  ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.S
   hexdump.c
   dupenv.c
   fopen.c

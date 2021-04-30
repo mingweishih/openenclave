@@ -224,6 +224,7 @@ if (OE_SGX)
     APPEND
     PLATFORM_SDK_ONLY_SRC
     ${PROJECT_SOURCE_DIR}/common/sgx/cpuid.c
+    ${PROJECT_SOURCE_DIR}/common/sgx/debugtsc.c
     sgx/calls.c
     sgx/create.c
     sgx/elf.c
@@ -256,7 +257,6 @@ if (OE_SGX)
       APPEND
       PLATFORM_SDK_ONLY_SRC
       ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.S
-      ${PROJECT_SOURCE_DIR}/common/sgx/debugtsc.c
       sgx/linux/aep.S
       sgx/enter.c
       sgx/linux/exception.c
@@ -271,6 +271,7 @@ if (OE_SGX)
     list(
       APPEND
       PLATFORM_SDK_ONLY_SRC
+      ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.asm
       sgx/windows/aep.asm
       ${CMAKE_CURRENT_BINARY_DIR}/enter.obj
       sgx/windows/exception.c
@@ -317,7 +318,6 @@ list(
   ${PROJECT_SOURCE_DIR}/common/safecrt.c
   ${PROJECT_SOURCE_DIR}/common/sha.c
   ${PROJECT_SOURCE_DIR}/common/sgx/debugtsc.c
-  ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.S
   memalign.c
   hexdump.c
   dupenv.c
@@ -325,6 +325,12 @@ list(
   tests.c
   result.c
   traceh.c)
+
+if (UNIX)
+  list(APPEND PLATFORM_HOST_ONLY_SRC ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.S)
+elseif (WIN32)
+  list(APPEND PLATFORM_HOST_ONLY_SRC ${PROJECT_SOURCE_DIR}/common/sgx/rdtsc.asm)
+endif ()
 
 # Common files that are used in the OE SDK only.
 list(

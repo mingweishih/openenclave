@@ -13,6 +13,8 @@ add_enclave(
   SOURCES
   enc.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/oecert_t.c
+  CRYPTO_LIB
+  OpenSSL
   CONFIG
   enc.conf)
 

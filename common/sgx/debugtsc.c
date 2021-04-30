@@ -9,7 +9,9 @@ uint64_t timestamps[100];
 oe_debug_location_t locations[100];
 int timestamps_index;
 
-inline void record_tsc(const char* file, int line, const char* function)
+/* inline does not work on Windows */
+// inline
+void record_tsc(const char* file, int line, const char* function)
 {
     locations[timestamps_index].file = file;
     locations[timestamps_index].line = line;
