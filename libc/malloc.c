@@ -17,6 +17,10 @@
 #undef __UNDEF_OE_NEED_STDC_NAMES
 #endif
 
+void* malloc(size_t size)
+{
+    return oe_malloc(size);
+}
 /*
  * __libc_malloc is used in in ldso, aio, thread, time, ldso, locale,
  * exit, and malloc. __libc_malloc() is defined in

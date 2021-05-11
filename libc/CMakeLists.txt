@@ -89,6 +89,7 @@ add_enclave_library(
   errno.c
   epoll.c
   exit.c
+  free.c
   freeaddrinfo.c
   getaddrinfo.c
   getnameinfo.c
@@ -97,6 +98,7 @@ add_enclave_library(
   link.c
   locale.c
   malloc.c
+  posix_memalign.c
   pthread.c
   sched_yield.c
   sigaction.c
@@ -911,6 +913,26 @@ if (WIN32
         AND CMAKE_C_COMPILER_VERSION VERSION_LESS 9.0))
   set_source_files_properties(${MUSLSRC}/search/twalk.c PROPERTIES COMPILE_FLAGS
                                                                    -O0)
+endif ()
+
+if (OE_SGX)
+  list(
+    APPEND
+    DEFAULT_VISIBILITY
+    malloc.c
+    free.c
+    posix_memalign.c
+    ${MUSLSRC}/string/bcmp.c
+    ${MUSLSRC}/string/memcmp.c
+    ${MUSLSRC}/string/x86_64/memcpy.s
+    ${MUSLSRC}/string/x86_64/memmove.s
+    ${MUSLSRC}/string/x86_64/memset.s
+    ${MUSLSRC}/stdlib/qsort.c)
+
+  set_property(
+    SOURCE ${DEFAULT_VISIBILITY}
+    APPEND_STRING
+    PROPERTY COMPILE_FLAGS " -fvisibility=default")
 endif ()
 
 enclave_compile_definitions(oelibc PRIVATE _XOPEN_SOURCE=700)
