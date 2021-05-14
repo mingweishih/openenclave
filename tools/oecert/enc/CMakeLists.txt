@@ -12,7 +12,7 @@ add_enclave(
   TARGET
   oecert_enc
   CRYPTO_LIB
-  mbedtls
+  openssl
   SOURCES
   enc.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/oecert_t.c
@@ -27,7 +27,7 @@ add_enclave_dependencies(oecert_enc enclave_key_pair)
 enclave_include_directories(oecert_enc PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 enclave_link_libraries(oecert_enc
-    oesnmalloc
+    #oesnmalloc
     oelibc)
 
 # Generate the enclave binary in the the same directory with the oecert binary

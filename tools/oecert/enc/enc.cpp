@@ -6,6 +6,7 @@
 #include <openenclave/attestation/sgx/evidence.h>
 #include <openenclave/edger8r/enclave.h>
 #include <openenclave/enclave.h>
+#include <openenclave/internal/print.h>
 #include <openenclave/internal/raise.h>
 #include <openenclave/internal/report.h>
 #include <openenclave/internal/safecrt.h>
@@ -182,6 +183,28 @@ oe_result_t verify_plugin_evidence(
     oe_result_t result = OE_UNEXPECTED;
     oe_claim_t* claims = NULL;
     size_t claims_length = 0;
+#if 0
+    void* array[30208] = {NULL};
+    uint64_t total = 0;
+    for (size_t i = 0; i < 30208; i++)
+    {
+        if (!(array[i] = malloc(4096)))
+            break;
+        total += 4096;
+        oe_host_printf("Total allocated: %lu\n", total);
+    }
+    for (size_t i = 0; i < 30208; i++)
+        free(array[i]);
+
+    void* large = malloc(4096 * 2 + 1);
+    if (!large)
+        oe_host_printf("large malloc failed\n");
+    else
+    {
+        oe_host_printf("large malloc succeeded\n");
+        free(large);
+    }
+#endif
 
     OE_CHECK(oe_verifier_initialize());
 
