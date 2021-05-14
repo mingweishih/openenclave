@@ -28,5 +28,11 @@ enclave {
           size_t endorsements_size,
           [out] size_t* endorsements_out_size
         );
+
+        public oe_result_t verify_plugin_evidence(
+          [in] const oe_uuid_t* format_id,
+          [in, count=evidence_size] uint8_t* evidence_in,
+          size_t evidence_size
+        );
     };
 };

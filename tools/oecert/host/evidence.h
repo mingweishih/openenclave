@@ -47,4 +47,9 @@ oe_result_t generate_oe_evidence(
     bool verify,
     bool verbose);
 
+oe_result_t verify_oe_evidence(
+    oe_enclave_t* enclave,
+    const oe_uuid_t* foramt_id,
+    const char* evidence_filename);
+
 #endif // _SGX_QUOTE

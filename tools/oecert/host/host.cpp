@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 #include <openenclave/attestation/verifier.h>
+#include <openenclave/attestation/sgx/evidence.h>
 #include <openenclave/corelibc/limits.h>
 #include <openenclave/host.h>
 #include <openenclave/internal/raise.h>
@@ -31,14 +32,32 @@
 #define INPUT_PARAM_QUOTE_IN_PROC "in"
 #define INPUT_PARAM_QUOTE_OUT_OF_PROC "out"
 #define INPUT_PARAM_OPTION_VERIFY "--verify"
+#define INPUT_PARAM_OPTION_SECURE_VERIFY "--secure-verify"
+#define INPUT_PARAM_OPTION_IN_FILE "--in"
 #define INPUT_PARAM_OPTION_OUT_FILE "--out"
 #define DEFAULT_LOG_FILE "oecert.log"
 #define INPUT_PARAM_OPTION_LOG_FILE "--log"
 #define INPUT_PARAM_OPTION_VERBOSE "--verbose"
+#define INPUT_PARAM_EVIDENCE_FORMAT "-f"
+#define INPUT_PARAM_EVIDENCE_FORMAT_ECDSA "ecdsa"
+#define INPUT_PARAM_EVIDENCE_FORMAT_REPORT "report"
+#define INPUT_PARAM_EVIDENCE_FORMAT_QUOTE "quote"
+#define INPUT_PARAM_EVIDENCE_FORMAT_CERT "cert"
 #define SGX_AESM_ADDR "SGX_AESM_ADDR"
 #if defined(_WIN32)
 #define SGX_AESM_ADDR_MAXSIZE 32
 #endif
+
+#define OE_FORMAT_UUID_CERT                               \
+{                                                                     \
+    0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0x00, 0x00, \
+        0x00, 0x00, 0x00, 0x00, 0x00                                  \
+}
+
+static const oe_uuid_t _legacy_report_remote = {OE_FORMAT_UUID_LEGACY_REPORT_REMOTE};
+static const oe_uuid_t raw_sgx_ecdsa_quote_uuid = {OE_FORMAT_UUID_RAW_SGX_QUOTE_ECDSA};
+static const oe_uuid_t _ecdsa_quote_uuid = {OE_FORMAT_UUID_SGX_ECDSA};
+static const oe_uuid_t _cert_uuid = {OE_FORMAT_UUID_CERT};
 
 // Structure to store input parameters
 //
@@ -46,6 +65,8 @@ typedef struct _input_params
 {
     const char* private_key_filename;
     const char* public_key_filename;
+    const char* in_filename;
+    const oe_uuid_t* evidence_format;
     const char* out_filename;
     const char* log_filename;
     const char* endorsements_filename;
@@ -54,6 +75,7 @@ typedef struct _input_params
     bool generate_report;
     bool generate_evidence;
     bool verify;
+    bool secure_verify;
     bool verbose;
 } input_params_t;
 
@@ -296,6 +318,8 @@ static int _parse_args(int argc, const char* argv[])
     _params.generate_report = false;
     _params.generate_certificate = false;
     _params.generate_evidence = false;
+    _params.in_filename = nullptr;
+    _params.evidence_format = nullptr;
     _params.out_filename = nullptr;
     _params.endorsements_filename = nullptr;
     _params.log_filename = DEFAULT_LOG_FILE;
@@ -351,6 +375,36 @@ static int _parse_args(int argc, const char* argv[])
             _params.endorsements_filename = argv[i + 1];
             i += 2;
         }
+        else if (strcmp(INPUT_PARAM_EVIDENCE_FORMAT, argv[i]) == 0)
+        {
+            if (argc < i + 2)
+                break;
+
+            const char* format = argv[i + 1];
+            if (strcmp(format, INPUT_PARAM_EVIDENCE_FORMAT_ECDSA) == 0)
+                _params.evidence_format = &_ecdsa_quote_uuid;
+            else if (strcmp(format, INPUT_PARAM_EVIDENCE_FORMAT_REPORT) == 0)
+                _params.evidence_format = &_legacy_report_remote;
+            else if (strcmp(format, INPUT_PARAM_EVIDENCE_FORMAT_QUOTE) == 0)
+                _params.evidence_format = &raw_sgx_ecdsa_quote_uuid;
+            else if (strcmp(format, INPUT_PARAM_EVIDENCE_FORMAT_CERT) == 0)
+                _params.evidence_format = &_cert_uuid;
+            else
+            {
+                printf("Invalid format: %s\n", argv[i+1]);
+                return 1;
+            }
+
+            i += 2;
+        }
+        else if (strcmp(INPUT_PARAM_OPTION_IN_FILE, argv[i]) == 0)
+        {
+            if (argc < i + 2)
+                break;
+
+            _params.in_filename = argv[i + 1];
+            i += 2;
+        }
 
         else if (strcmp(INPUT_PARAM_OPTION_OUT_FILE, argv[i]) == 0)
         {
@@ -364,6 +418,12 @@ static int _parse_args(int argc, const char* argv[])
         else if (strcmp(INPUT_PARAM_OPTION_VERIFY, argv[i]) == 0)
         {
             _params.verify = true;
+            i++;
+        }
+
+        else if (strcmp(INPUT_PARAM_OPTION_SECURE_VERIFY, argv[i]) == 0)
+        {
+            _params.secure_verify = true;
             i++;
         }
 
@@ -554,6 +614,13 @@ static oe_result_t _process_params(oe_enclave_t* enclave)
             _params.endorsements_filename,
             _params.verify,
             _params.verbose));
+    }
+    else if (_params.secure_verify)
+    {
+        OE_CHECK(verify_oe_evidence(
+            enclave,
+            _params.evidence_format,
+            _params.in_filename));
     }
 
     result = OE_OK;

@@ -936,3 +936,120 @@ oe_result_t generate_oe_evidence(
 done:
     return result;
 }
+
+static size_t get_filesize(FILE* fp)
+{
+    size_t size = 0;
+    fseek(fp, 0, SEEK_END);
+    size = (size_t)ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    return size;
+}
+
+static bool read_binary_file(
+    const char* filename,
+    uint8_t** data_ptr,
+    size_t* size_ptr)
+{
+    size_t size = 0;
+    uint8_t* data = NULL;
+    size_t bytes_read = 0;
+    bool result = false;
+    FILE* fp = NULL;
+#ifdef _WIN32
+    if (fopen_s(&fp, filename, "rb") != 0)
+#else
+    if (!(fp = fopen(filename, "rb")))
+#endif
+    {
+        fprintf(stderr, "Failed to open: %s\n", filename);
+        goto exit;
+    }
+
+    *data_ptr = NULL;
+    *size_ptr = 0;
+
+    // Find file size
+    size = get_filesize(fp);
+    if (size == 0)
+    {
+        fprintf(stderr, "Empty file: %s\n", filename);
+        goto exit;
+    }
+
+    data = (uint8_t*)malloc(size);
+    if (data == NULL)
+    {
+        fprintf(
+            stderr,
+            "Failed to allocate memory of size %lu\n",
+            (unsigned long)size);
+        goto exit;
+    }
+
+    bytes_read = fread(data, sizeof(uint8_t), size, fp);
+    if (bytes_read != size)
+    {
+        fprintf(stderr, "Failed to read file: %s\n", filename);
+        goto exit;
+    }
+
+    result = true;
+
+exit:
+    if (fp)
+    {
+        fclose(fp);
+    }
+
+    if (!result)
+    {
+        if (data != NULL)
+        {
+            free(data);
+            data = NULL;
+        }
+        bytes_read = 0;
+    }
+
+    *data_ptr = data;
+    *size_ptr = bytes_read;
+
+    return result;
+}
+
+oe_result_t verify_oe_evidence(
+    oe_enclave_t* enclave,
+    const oe_uuid_t* foramt_id,
+    const char* evidence_filename)
+{
+    oe_result_t result = OE_UNEXPECTED;
+    size_t evidence_file_size = 0;
+    uint8_t* evidence_data = NULL;
+
+    if (!read_binary_file(
+            evidence_filename, &evidence_data, &evidence_file_size))
+    {
+        result = OE_INVALID_PARAMETER;
+        goto done;
+    }
+
+    verify_plugin_evidence(
+            enclave,
+            &result,
+            foramt_id,
+            evidence_data,
+            evidence_file_size);
+
+     OE_CHECK_MSG(
+         result,
+         "Failed to verify_plugin_evidence. Error: %s\n",
+         oe_result_str(result));
+
+    result = OE_OK;
+
+done:
+    free(evidence_data);
+    return result;
+}

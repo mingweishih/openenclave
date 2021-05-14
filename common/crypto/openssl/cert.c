@@ -9,6 +9,9 @@
 #include <openenclave/internal/crypto/init.h>
 #endif
 #include <openenclave/internal/pem.h>
+#if defined(OE_BUILD_ENCLAVE)
+#include <openenclave/internal/print.h>
+#endif
 #include <openenclave/internal/raise.h>
 #include <openenclave/internal/safecrt.h>
 #include <openenclave/internal/trace.h>
@@ -163,6 +166,29 @@ done:
     return result;
 }
 
+#if defined(OE_BUILD_ENCLAVE)
+    static int count = 0;
+
+#if 1
+    static void cert_dump(char* data, size_t len)
+    {
+        size_t data_size = strlen(data);
+        oe_host_printf("[Dump cert] len: %zu, strlen: %zu\n", len, data_size);
+        oe_host_printf("String:\n%s\n", data);
+        oe_host_printf("Hex:");
+        for (size_t i = 0; i < data_size; i++)
+        {
+            if (data[i] <= 0xf)
+                oe_host_printf(" 0%x", data[i]);
+            else
+                oe_host_printf(" %x", data[i]);
+        }
+        oe_host_printf("\n");
+    }
+#endif
+
+#endif
+
 /* Clone the certificate to clear any verification state */
 static X509* _clone_x509(X509* x509)
 {
@@ -171,25 +197,74 @@ static X509* _clone_x509(X509* x509)
     BIO* in = NULL;
     BUF_MEM* mem;
 
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_x509] start: %d\n", count);
+    count++;
+#endif
+
     if (!x509)
         goto done;
+
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_x509] 2\n");
+#endif
 
     if (!(out = BIO_new(BIO_s_mem())))
         goto done;
 
+
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_x509] 3\n");
+#endif
+
     if (!PEM_write_bio_X509(out, x509))
         goto done;
+
+
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_x509] 4\n");
+#endif
 
     if (!BIO_get_mem_ptr(out, &mem))
         goto done;
 
+
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_x509] 5\n");
+#endif
+
     if (mem->length > OE_INT_MAX)
         goto done;
+
+
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_x509] 6\n");
+    if (count == 40)
+        cert_dump(mem->data, mem->length);
+#endif
 
     if (!(in = BIO_new_mem_buf(mem->data, (int)mem->length)))
         goto done;
 
+
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_x509] 7\n");
+    BIO* bio_err = NULL;
+#endif
+
     ret = PEM_read_bio_X509(in, NULL, 0, NULL);
+
+
+#if defined(OE_BUILD_ENCLAVE)
+    if (!ret)
+    {
+        oe_host_printf("[_clone_x509] PEM_read_bio_X509 failed\n");
+        BIO_printf(bio_err, "unable to load certificate\n");
+        ERR_print_errors(bio_err);
+    }
+    else
+        oe_host_printf("[_clone_x509] PEM_read_bio_X509 succeeded\n");
+#endif
 
 done:
 
@@ -247,21 +322,46 @@ static STACK_OF(X509) * _clone_chain(STACK_OF(X509) * chain)
     STACK_OF(X509)* sk = NULL;
     int n = sk_X509_num(chain);
 
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_chain] start\n");
+#endif
+
     if (!(sk = sk_X509_new(NULL)))
         return NULL;
+
+
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_chain] sk num: %d\n", n);
+#endif
 
     for (int i = 0; i < n; i++)
     {
         X509* x509;
 
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_chain] loop: %d\n", i);
+#endif
+
         if (!(x509 = sk_X509_value(chain, (int)i)))
             return NULL;
+
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_chain] sk_X509_value pass\n");
+#endif
 
         if (!(x509 = _clone_x509(x509)))
             return NULL;
 
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_chain] _clone_x509 pass\n");
+#endif
+
         if (!sk_X509_push(sk, x509))
             return NULL;
+
+#if defined(OE_BUILD_ENCLAVE)
+    oe_host_printf("[_clone_chain] sk_x509_push pass\n");
+#endif
     }
 
     return sk;

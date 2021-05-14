@@ -20,12 +20,53 @@
 
 /* Flags to control runtime behavior. */
 bool oe_use_debug_malloc = true;
-bool oe_use_debug_malloc_memset = true;
+bool oe_use_debug_malloc_memset = false;
 
 /* Flags to define the local tracking state. */
 bool oe_use_debug_malloc_tracking = false;
 /* Session number to identify the session of local tracking. */
 int32_t oe_debug_malloc_session_number = 0;
+
+uint64_t user_heap_usage = 0;
+uint64_t user_heap_usage_peak = 0;
+uint64_t total_heap_usage = 0;
+uint64_t total_heap_usage_peak = 0;
+
+static void _track_heap_usage(uint64_t total, uint64_t user, bool is_free)
+{
+    if (!is_free)
+    {
+        total_heap_usage += total;
+        user_heap_usage += user;
+    }
+    else
+    {
+        total_heap_usage -= total;
+        user_heap_usage -= user;
+    }
+
+    if (total_heap_usage_peak < total_heap_usage)
+        total_heap_usage_peak = total_heap_usage;
+    
+    if (total_heap_usage_peak < total_heap_usage)
+        total_heap_usage_peak = total_heap_usage;
+
+    if (oe_use_debug_malloc)
+    {
+        oe_host_printf("[HEAP USAGE] User: %lu, Total: %lu (+%lu), Peak: %lu (+%lu)\n",
+                       user_heap_usage,
+                       total_heap_usage,
+                       total_heap_usage - user_heap_usage,
+                       total_heap_usage_peak,
+                       total_heap_usage_peak - user_heap_usage_peak);
+    }
+    else
+    {
+        oe_host_printf("[HEAP USAGE] User: %lu, Peak: %lu\n",
+                       user_heap_usage,
+                       user_heap_usage_peak);
+    }
+}
 
 /*
 **==============================================================================
@@ -171,6 +212,7 @@ OE_INLINE size_t _get_padding_size(size_t alignment)
     return oe_round_up_to_multiple(header_size, alignment) - header_size;
 }
 
+__attribute__((unused))
 OE_INLINE void* _get_block_address(void* ptr)
 {
     header_t* header = _get_header(ptr);
@@ -193,6 +235,7 @@ OE_INLINE size_t _calculate_block_size(size_t alignment, size_t size)
     return r;
 }
 
+__attribute__((unused))
 OE_INLINE size_t _get_block_size(void* ptr)
 {
     const header_t* header = _get_header(ptr);
@@ -231,6 +274,7 @@ static void _list_insert(list_t* list, header_t* header)
     oe_spin_unlock(&_spin);
 }
 
+__attribute__((unused))
 static void _list_remove(list_t* list, header_t* header)
 {
     oe_spin_lock(&_spin);
@@ -339,6 +383,8 @@ void* oe_debug_malloc(size_t size)
     _check_block(header);
     _list_insert(&_list, header);
 
+    _track_heap_usage(block_size, size, false);
+
     return header->data;
 }
 
@@ -353,7 +399,12 @@ void oe_debug_free(void* ptr)
         /* Fill the whole block with 0xDD (Deallocated) bytes */
         void* block = _get_block_address(ptr);
         size_t block_size = _get_block_size(ptr);
-        oe_memset_s(block, block_size, 0xDD, block_size);
+        if (oe_use_debug_malloc_memset)
+        {
+            oe_memset_s(block, block_size, 0xDD, block_size);
+        }
+
+        _track_heap_usage(block_size, header->size, true);
 
         oe_allocator_free(block);
     }
@@ -431,6 +482,8 @@ int oe_debug_posix_memalign(void** memptr, size_t alignment, size_t size)
 
     header = (header_t*)((uint8_t*)block + padding_size);
 
+    _track_heap_usage(block_size, size, false);
+
     INIT_BLOCK(header, alignment, size);
     _check_block(header);
     _list_insert(&_list, header);
@@ -507,6 +560,7 @@ void* oe_malloc(size_t size)
     }
     else
     {
+        _track_heap_usage(0, size, false);
         p = oe_allocator_malloc(size);
     }
 
@@ -527,6 +581,8 @@ void oe_free(void* ptr)
     }
     else
     {
+        size_t size = oe_malloc_usable_size(ptr);
+        _track_heap_usage(0, size, true);
         oe_allocator_free(ptr);
     }
 }
@@ -540,6 +596,7 @@ void* oe_calloc(size_t nmemb, size_t size)
     }
     else
     {
+        _track_heap_usage(0, size, false);
         p = oe_allocator_calloc(nmemb, size);
     }
 
@@ -561,6 +618,9 @@ void* oe_realloc(void* ptr, size_t size)
     }
     else
     {
+        size_t old_size = oe_malloc_usable_size(ptr);
+        _track_heap_usage(0, old_size, true);
+        _track_heap_usage(0, size, false);
         p = oe_allocator_realloc(ptr, size);
     }
 
@@ -593,7 +653,10 @@ int oe_posix_memalign(void** memptr, size_t alignment, size_t size)
     if (oe_use_debug_malloc)
         rc = oe_debug_posix_memalign(memptr, alignment, size);
     else
+    {
+        _track_heap_usage(0, size, false);
         rc = oe_posix_memalign(memptr, alignment, size);
+    }
 
     if (rc != 0 && size)
     {
