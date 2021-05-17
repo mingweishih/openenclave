@@ -28,6 +28,7 @@ bool oe_use_debug_malloc_tracking = false;
 /* Session number to identify the session of local tracking. */
 int32_t oe_debug_malloc_session_number = 0;
 
+bool enable_heap_usage_tracker = false;
 uint64_t user_heap_usage = 0;
 uint64_t user_heap_usage_peak = 0;
 uint64_t total_heap_usage = 0;
@@ -35,6 +36,9 @@ uint64_t total_heap_usage_peak = 0;
 
 static void _track_heap_usage(uint64_t total, uint64_t user, bool is_free)
 {
+    if (!enable_heap_usage_tracker)
+        return;
+
     if (!is_free)
     {
         total_heap_usage += total;
@@ -48,36 +52,42 @@ static void _track_heap_usage(uint64_t total, uint64_t user, bool is_free)
 
     if (total_heap_usage_peak < total_heap_usage)
         total_heap_usage_peak = total_heap_usage;
-    
+
     if (user_heap_usage_peak < user_heap_usage)
         user_heap_usage_peak = user_heap_usage;
 
     if (oe_use_debug_malloc)
     {
-        oe_host_printf("[HEAP USAGE] User: %lu (%c%lu) Peak: %lu, Total: %lu (%c%lu), Peak: %lu (+%lu)\n",
-                       user_heap_usage,
-                       (is_free) ? '-' : '+',
-                       user,
-                       user_heap_usage_peak,
-                       total_heap_usage,
-                       (is_free) ? '-' : '+',
-                       total,
-                       total_heap_usage_peak,
-                       total_heap_usage_peak - user_heap_usage_peak);
+        oe_host_printf(
+            "[HEAP USAGE] User: %lu (%c%lu) Peak: %lu, Total: %lu (%c%lu), "
+            "Peak: %lu (+%lu)\n",
+            user_heap_usage,
+            (is_free) ? '-' : '+',
+            user,
+            user_heap_usage_peak,
+            total_heap_usage,
+            (is_free) ? '-' : '+',
+            total,
+            total_heap_usage_peak,
+            total_heap_usage_peak - user_heap_usage_peak);
     }
     else
     {
-        oe_host_printf("[HEAP USAGE] User: %lu (%c%lu), Peak: %lu\n",
-                       user_heap_usage,
-                       (is_free) ? '_' : '+',
-                       user,
-                       user_heap_usage_peak);
+        oe_host_printf(
+            "[HEAP USAGE] User: %lu (%c%lu), Peak: %lu\n",
+            user_heap_usage,
+            (is_free) ? '_' : '+',
+            user,
+            user_heap_usage_peak);
     }
 
     {
         oe_mallinfo_t info;
         oe_allocator_mallinfo(&info);
-        oe_host_printf("[MALLOC INFO] current: %zu, peak: %zu\n", info.current_allocated_heap_size, info.peak_allocated_heap_size);
+        oe_host_printf(
+            "[MALLOC INFO] current: %zu, peak: %zu\n",
+            info.current_allocated_heap_size,
+            info.peak_allocated_heap_size);
     }
 }
 
@@ -225,8 +235,7 @@ OE_INLINE size_t _get_padding_size(size_t alignment)
     return oe_round_up_to_multiple(header_size, alignment) - header_size;
 }
 
-__attribute__((unused))
-OE_INLINE void* _get_block_address(void* ptr)
+__attribute__((unused)) OE_INLINE void* _get_block_address(void* ptr)
 {
     header_t* header = _get_header(ptr);
     const size_t padding_size = _get_padding_size(header->alignment);
@@ -248,8 +257,7 @@ OE_INLINE size_t _calculate_block_size(size_t alignment, size_t size)
     return r;
 }
 
-__attribute__((unused))
-OE_INLINE size_t _get_block_size(void* ptr)
+__attribute__((unused)) OE_INLINE size_t _get_block_size(void* ptr)
 {
     const header_t* header = _get_header(ptr);
     return _calculate_block_size(header->alignment, header->size);
@@ -287,8 +295,7 @@ static void _list_insert(list_t* list, header_t* header)
     oe_spin_unlock(&_spin);
 }
 
-__attribute__((unused))
-static void _list_remove(list_t* list, header_t* header)
+__attribute__((unused)) static void _list_remove(list_t* list, header_t* header)
 {
     oe_spin_lock(&_spin);
     {
@@ -377,15 +384,21 @@ static void _dump(bool need_lock)
 **==============================================================================
 */
 
-typedef struct _heap_tracker {
+#define PADDING 256
+
+typedef struct _heap_tracker
+{
     size_t size;
+    uint8_t padding[PADDING];
     uint8_t data[];
 } heap_tracker_t;
+
+size_t offset = PADDING + sizeof(size_t);
 
 void* oe_debug_malloc(size_t size)
 {
     void* block;
-    size_t block_size = size + sizeof(size_t);
+    size_t block_size = size + offset;
     if (!(block = oe_allocator_malloc(block_size)))
     {
         oe_host_printf("[oe_debug_malloc] malloc failed: %zu\n", size);
@@ -430,9 +443,9 @@ void oe_debug_free(void* ptr)
 {
     if (ptr)
     {
-        heap_tracker_t* tracker = (heap_tracker_t*)((uint64_t)ptr - sizeof(size_t));
+        heap_tracker_t* tracker = (heap_tracker_t*)((uint64_t)ptr - offset);
         size_t size = tracker->size;
-        _track_heap_usage(size + sizeof(size_t), size, true);
+        _track_heap_usage(size + offset, size, true);
         oe_allocator_free(tracker);
     }
 #if 0
@@ -478,19 +491,22 @@ void* oe_debug_realloc(void* ptr, size_t size)
 {
     if (ptr)
     {
-        heap_tracker_t* tracker = (heap_tracker_t*)((uint64_t)ptr - sizeof(size_t));
-        void* block = oe_allocator_realloc(tracker, size + sizeof(size_t));
+        heap_tracker_t* tracker = (heap_tracker_t*)((uint64_t)ptr - offset);
+        void* block = oe_allocator_realloc(tracker, size + offset);
         if (!block)
         {
             oe_host_printf("[oe_debug_realloc] failed\n");
             return NULL;
         }
         heap_tracker_t* new_tracker = (heap_tracker_t*)block;
-        oe_host_printf("[oe_debug_realloc] %zu -> %zu\n", new_tracker->size, size);
+        oe_host_printf(
+            "[oe_debug_realloc] %zu -> %zu\n", new_tracker->size, size);
         if (size > new_tracker->size)
-            _track_heap_usage(size - new_tracker->size, size - new_tracker->size, false);
+            _track_heap_usage(
+                size - new_tracker->size, size - new_tracker->size, false);
         else
-            _track_heap_usage(new_tracker->size - size, new_tracker->size - size, true);
+            _track_heap_usage(
+                new_tracker->size - size, new_tracker->size - size, true);
         new_tracker->size = size;
 
         return new_tracker->data;

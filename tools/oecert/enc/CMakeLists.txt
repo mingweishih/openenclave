@@ -26,9 +26,7 @@ add_enclave_dependencies(oecert_enc enclave_key_pair)
 # Need for the generated file oecert_t.h
 enclave_include_directories(oecert_enc PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
-enclave_link_libraries(oecert_enc
-    #oesnmalloc
-    oelibc)
+enclave_link_libraries(oecert_enc oesnmalloc oelibc)
 
 # Generate the enclave binary in the the same directory with the oecert binary
 set_enclave_properties(oecert_enc PROPERTIES RUNTIME_OUTPUT_DIRECTORY

@@ -2,8 +2,8 @@
 // Licensed under the MIT License.
 
 #include <openenclave/attestation/attester.h>
-#include <openenclave/attestation/verifier.h>
 #include <openenclave/attestation/sgx/evidence.h>
+#include <openenclave/attestation/verifier.h>
 #include <openenclave/edger8r/enclave.h>
 #include <openenclave/enclave.h>
 #include <openenclave/internal/print.h>
@@ -183,28 +183,6 @@ oe_result_t verify_plugin_evidence(
     oe_result_t result = OE_UNEXPECTED;
     oe_claim_t* claims = NULL;
     size_t claims_length = 0;
-#if 0
-    void* array[30208] = {NULL};
-    uint64_t total = 0;
-    for (size_t i = 0; i < 30208; i++)
-    {
-        if (!(array[i] = malloc(4096)))
-            break;
-        total += 4096;
-        oe_host_printf("Total allocated: %lu\n", total);
-    }
-    for (size_t i = 0; i < 30208; i++)
-        free(array[i]);
-
-    void* large = malloc(4096 * 2 + 1);
-    if (!large)
-        oe_host_printf("large malloc failed\n");
-    else
-    {
-        oe_host_printf("large malloc succeeded\n");
-        free(large);
-    }
-#endif
 
     OE_CHECK(oe_verifier_initialize());
 
@@ -236,6 +214,6 @@ OE_SET_ENCLAVE_SGX(
     1,    /* ProductID */
     1,    /* SecurityVersion */
     true, /* Debug */
-    30208,  /* NumHeapPages */
-    1024,  /* NumStackPages */
+    1024, /* NumHeapPages */
+    1024, /* NumStackPages */
     1);   /* NumTCS */
