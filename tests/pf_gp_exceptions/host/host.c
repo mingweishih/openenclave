@@ -54,9 +54,20 @@ int main(int argc, const char* argv[])
         OE_TEST(return_value == 0);
     }
     else
+    {
         printf("CPU does not support the CapturePFGPExceptions=1 "
-               "configuration. Skip "
-               "the test ECALL.\n");
+               "configuration.\n");
+#ifdef DEBUG_BUILD
+        printf("Simulate the #PF in debug build.\n");
+        result = enc_pf_gp_exceptions(enclave, &return_value);
+        if (result != OE_OK)
+            oe_put_err("oe_call_enclave() failed: result=%u", result);
+
+        OE_TEST(return_value == 0);
+#else
+        printf("Skip the test ECALL on non-debug build\n");
+#endif
+    }
 
     result = oe_terminate_enclave(enclave);
     OE_TEST(result == OE_OK);

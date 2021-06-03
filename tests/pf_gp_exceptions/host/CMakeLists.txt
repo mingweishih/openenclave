@@ -12,6 +12,10 @@ add_custom_command(
 
 add_executable(pf_gp_exceptions_host host.c pf_gp_exceptions_u.c)
 
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+  target_compile_definitions(pf_gp_exceptions_host PRIVATE DEBUG_BUILD)
+endif ()
+
 target_include_directories(pf_gp_exceptions_host
                            PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(pf_gp_exceptions_host oehost)

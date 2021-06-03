@@ -3,16 +3,17 @@
 
 #include <openenclave/bits/sgx/sgxtypes.h>
 #include <openenclave/enclave.h>
-#include <openenclave/internal/cpuid.h>
-#include <openenclave/internal/sgx/td.h>
-#include <openenclave/internal/thread.h>
 #include <openenclave/internal/calls.h>
 #include <openenclave/internal/constants_x64.h>
+#include <openenclave/internal/cpuid.h>
 #include <openenclave/internal/fault.h>
 #include <openenclave/internal/globals.h>
 #include <openenclave/internal/jump.h>
 #include <openenclave/internal/safecrt.h>
+#include <openenclave/internal/sgx/td.h>
+#include <openenclave/internal/thread.h>
 #include <openenclave/internal/trace.h>
+#include "../tracee.h"
 #include "asmdefs.h"
 #include "context.h"
 #include "cpuid.h"
@@ -402,7 +403,8 @@ void oe_virtual_exception_dispatcher(
     if (!is_exit_info_valid)
     {
         // Consider manually provided exception information for SGX1
-        if (oe_exception_record)
+        // Only allow the simulated #PF in debug mode
+        if (is_enclave_debug_allowed() && oe_exception_record)
         {
             td->exception_address = ssa_gpr->rip;
 
@@ -410,6 +412,11 @@ void oe_virtual_exception_dispatcher(
              * oe_exception_record instead */
             td->exception_code = OE_EXCEPTION_PAGE_FAULT;
             td->exception_flags |= OE_EXCEPTION_FLAGS_HARDWARE;
+
+            /* We cannot know the faulting address that triggers #PF on SGX1
+             * unless the host passes in the information. */
+            td->faulting_address = 0;
+            td->error_code = OE_SGX_PAGE_FAULT_US_FLAG;
         }
         else
         {
@@ -480,40 +487,5 @@ void oe_virtual_exception_dispatcher(
     // Acknowledge this exception is an enclave exception, host should let keep
     // running, and let enclave handle the exception.
     *arg_out = OE_EXCEPTION_CONTINUE_EXECUTION;
-    return;
-}
-
-/*
-**==============================================================================
-**
-** void oe_cleanup_xstates(void)
-**
-**  Cleanup all XSTATE registers that include both legacy registers and extended
-**  registers.
-**
-**==============================================================================
-*/
-
-void oe_cleanup_xstates(void)
-{
-    // Temporary workaround for #144 xrstor64 fault with optimized builds as
-    // reserved guard pages
-    // are incorrectly accessed. Xsave area is increased from 0x240 to 0x1000.
-    // Making these static
-    OE_ALIGNED(OE_XSAVE_ALIGNMENT)
-    static uint8_t
-        xsave_area[OE_MINIMAL_XSTATE_AREA_SIZE]; //#144 Making this static
-//__builtin_ia32_xrstor64 has different argument types in clang and gcc
-#ifdef __clang__
-    uint64_t restore_mask = ~((uint64_t)0x0);
-#else
-    int64_t restore_mask = ~(0x0);
-#endif
-
-    // The legacy registers(F87, SSE) values will be loaded from the
-    // LEGACY_XSAVE_AREA that at beginning of xsave_area.The extended registers
-    // will be initialized to their default values.
-    __builtin_ia32_xrstor64(xsave_area, restore_mask);
-
     return;
 }
