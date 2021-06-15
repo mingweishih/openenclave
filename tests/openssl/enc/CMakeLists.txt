@@ -105,7 +105,8 @@ function (add_openssl_test_enc NAME BUILDTEST)
     # test linking against LVI-mitigated libraries.
     ADD_LVI_MITIGATION
     CRYPTO_LIB
-    OpenSSL
+    SymCrypt_FIPS
+    #OpenSSL
     SOURCES
     ${TEST_SRC})
 
@@ -137,8 +138,24 @@ function (add_openssl_test_enc NAME BUILDTEST)
 
   enclave_include_directories(openssl-${NAME}_enc PRIVATE ${INCLUDE_PATHS})
 
-  enclave_link_libraries(openssl-${NAME}_enc openssl-support openssl-common
-                         oehostsock oehostfs oehostresolver)
+  #enclave_link_libraries(openssl-${NAME}_enc openssl-support openssl-common
+  #                       oehostsock oehostfs oehostresolver)
+
+  # CMAKE_SKIP_RPATH needs to be set in the parent scope
+  set(CMAKE_SKIP_RPATH
+      "${CMAKE_SKIP_RPATH}"
+      PARENT_SCOPE)
+
+  enclave_link_libraries(
+    openssl-${NAME}_enc
+    openssl-support
+    openssl-common
+    ${CMAKE_CURRENT_SOURCE_DIR}/libsymcrypt.so
+    oehostsock
+    oehostfs
+    oehostresolver)
+
+  configure_file(libsymcrypt.so libsymcrypt.so COPYONLY)
 
   if (WIN32)
     maybe_build_using_clangw(openssl-${NAME}_enc)

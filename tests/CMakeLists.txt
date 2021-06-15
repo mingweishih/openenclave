@@ -130,6 +130,7 @@ if (UNIX
     add_subdirectory(sim-mode)
     add_subdirectory(stdc)
     add_subdirectory(stdcxx)
+    add_subdirectory(symcrypt_loading)
     add_subdirectory(syscall)
     add_subdirectory(thread)
     add_subdirectory(threadcxx)
