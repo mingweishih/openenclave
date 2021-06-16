@@ -3,7 +3,7 @@
 
 #include <openenclave/edger8r/enclave.h>
 #include <openenclave/enclave.h>
-#include <openssl/engine.h>
+#include <openenclave/internal/crypto/init.h>
 #include <sys/mount.h>
 #include "openssl_t.h"
 #include "tu_local.h" /* Header from openssl/test/testutil */
@@ -15,7 +15,6 @@ extern int main(int argc, char* argv[]);
 int enc_test(int argc, char** argv, char** env)
 {
     int ret = 1;
-    ENGINE* eng = NULL;
     const BIO_METHOD* tap = NULL;
 
     /* Directly use environ from host. */
@@ -41,26 +40,10 @@ int enc_test(int argc, char** argv, char** env)
         goto done;
 #endif
 
-    /*
-     * Initialize and opt-in the rdrand engine. This is necessary to use opensl
-     * RNG functionality inside the enclave.
-     */
-    ENGINE_load_rdrand();
-    eng = ENGINE_by_id("rdrand");
-    if (eng == NULL)
-    {
-        goto done;
-    }
-
-    if (ENGINE_init(eng) == 0)
-    {
-        goto done;
-    }
-
-    if (ENGINE_set_default(eng, ENGINE_METHOD_RAND) == 0)
-    {
-        goto done;
-    }
+    if (oe_is_symcrypt_engine_available() == 1)
+        printf("symcrypt engine is available\n");
+    else
+        printf("symcrypt engine is not available\n");
 
     /*
      * Hold the reference to the tap method that is used by the OpenSSL test
@@ -78,12 +61,6 @@ done:
 #endif
     if (__environ)
         __environ = NULL;
-    if (eng)
-    {
-        ENGINE_finish(eng);
-        ENGINE_free(eng);
-        ENGINE_cleanup();
-    }
     if (tap)
         BIO_meth_free((BIO_METHOD*)tap);
 

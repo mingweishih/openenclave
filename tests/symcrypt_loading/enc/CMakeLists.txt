@@ -13,6 +13,8 @@ add_custom_command(
 add_enclave(TARGET symcrypt_loading_enc CXX SOURCES enc.cpp
             ${CMAKE_CURRENT_BINARY_DIR}/symcrypt_loading_t.c)
 
+maybe_build_using_clangw(symcrypt_loading_enc)
+
 enclave_include_directories(
   symcrypt_loading_enc PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/inc ${CMAKE_CURRENT_SOURCE_DIR}/include)

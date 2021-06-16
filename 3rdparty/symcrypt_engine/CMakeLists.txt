@@ -42,6 +42,8 @@ enclave_include_directories(
   ${CMAKE_BINARY_DIR}/3rdparty/openssl/build/include # for opensslconf.h
   ${OPENSSL_DIR}/include)
 
+maybe_build_using_clangw(symcryptengine)
+
 enclave_compile_options(symcryptengine
   PRIVATE
   -Wno-shorten-64-to-32
