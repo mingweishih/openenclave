@@ -10,6 +10,12 @@
 #include "../host/sgx/cpuid.h"
 #include "pf_gp_exceptions_u.h"
 
+void ocall_access(uint64_t address)
+{
+    volatile int access = *(int*)address;
+    printf("host access succeed, get: %d\n", access);
+}
+
 static bool _is_misc_region_supported()
 {
     uint32_t eax, ebx, ecx, edx;

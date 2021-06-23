@@ -41,6 +41,8 @@ static void _host_signal_handler(
      * occurs inside an enclave if the faulting address is outside of the
      * enclave memory range. */
     host_context.faulting_address = (uint64_t)sig_info->si_addr;
+    printf(
+        "[_host_signal_handler] si_addr: 0x%lx\n", (uint64_t)sig_info->si_addr);
 
     // Call platform neutral handler.
     uint64_t action = oe_host_handle_exception(&host_context);

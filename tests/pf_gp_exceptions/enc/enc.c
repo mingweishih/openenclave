@@ -79,6 +79,30 @@ int enc_pf_gp_exceptions(int is_misc_region_supported)
     }
     oe_host_printf("Test #PF on 0x%lx passed\n", faulting_address);
 
+    faulting_address = 1;
+    bypass_bytes = MOV_INSTRUCTION_BYTES;
+
+    asm volatile("mov $8, %r8\n\t"
+                 "mov (%r8), %r8");
+    if (is_misc_region_supported)
+    {
+        OE_TEST(faulting_address == 8);
+        OE_TEST(exception_code == OE_EXCEPTION_PAGE_FAULT);
+    }
+    else
+    {
+        /* faulting_address is passed in by the host */
+        /* ATTN: si_addr always returns 0, causing this test fail */
+        if (faulting_address != 8)
+            oe_host_printf(
+                "Test failed. faulting_address returned by the host: 0x%lx "
+                "(expected 0x8)\n",
+                faulting_address);
+        OE_TEST(exception_code == OE_EXCEPTION_PAGE_FAULT);
+        OE_TEST(error_code == OE_SGX_PAGE_FAULT_US_FLAG);
+    }
+    oe_host_printf("Test #PF on 0x%lx passed\n", faulting_address);
+
     /* Trigger #GP */
     faulting_address = 1;
     bypass_bytes = LGDT_INSTRUCTION_BYTES;
@@ -99,6 +123,8 @@ int enc_pf_gp_exceptions(int is_misc_region_supported)
         OE_TEST(error_code == OE_SGX_PAGE_FAULT_US_FLAG);
     }
     oe_host_printf("Test #GP passed\n");
+
+    ocall_access(8);
 
     return 0;
 }

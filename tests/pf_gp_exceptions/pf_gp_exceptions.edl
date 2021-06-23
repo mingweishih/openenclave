@@ -9,4 +9,8 @@ enclave {
     trusted {
         public int enc_pf_gp_exceptions(int is_misc_region_supported);
     };
+
+    untrusted {
+        void ocall_access(uint64_t address);
+    };
 };
