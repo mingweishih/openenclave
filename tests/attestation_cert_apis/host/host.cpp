@@ -64,7 +64,7 @@ done:
     return result;
 }
 
-void run_test(oe_enclave_t* enclave, int test_type)
+void run_test(oe_enclave_t* enclave, int test_type, int api_version)
 {
     oe_result_t result = OE_FAILURE;
     oe_result_t ecall_result;
@@ -77,12 +77,12 @@ void run_test(oe_enclave_t* enclave, int test_type)
     if (test_type == TEST_EC_KEY)
     {
         result = get_tls_cert_signed_with_ec_key(
-            enclave, &ecall_result, &cert, &cert_size);
+            enclave, &ecall_result, &cert, &cert_size, api_version);
     }
     else if (test_type == TEST_RSA_KEY)
     {
         result = get_tls_cert_signed_with_rsa_key(
-            enclave, &ecall_result, &cert, &cert_size);
+            enclave, &ecall_result, &cert, &cert_size, api_version);
     }
 
     if ((result != OE_OK) || (ecall_result != OE_OK))
@@ -195,8 +195,10 @@ int main(int argc, const char* argv[])
              argv[1], OE_ENCLAVE_TYPE_SGX, flags, NULL, 0, &enclave)) != OE_OK)
         oe_put_err("oe_create_enclave(): result=%u", result);
 
-    run_test(enclave, TEST_EC_KEY);
-    run_test(enclave, TEST_RSA_KEY);
+    run_test(enclave, TEST_EC_KEY, 2);
+    run_test(enclave, TEST_RSA_KEY, 2);
+    run_test(enclave, TEST_EC_KEY, 3);
+    run_test(enclave, TEST_RSA_KEY, 3);
 
     result = oe_terminate_enclave(enclave);
     OE_TEST(result == OE_OK);

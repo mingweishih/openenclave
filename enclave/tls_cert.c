@@ -318,6 +318,105 @@ done:
     return result;
 }
 
+oe_result_t oe_get_attestation_certificate_with_evidence_v3(
+    const oe_uuid_t* format_id,
+    const unsigned char* subject_name,
+    uint8_t* private_key,
+    size_t private_key_size,
+    uint8_t* public_key,
+    size_t public_key_size,
+    uint8_t* runtime_claims,
+    size_t runtime_claims_size,
+    uint8_t* inittime_claims,
+    size_t inittime_claims_size,
+    const void* optional_parameters,
+    size_t optional_parameters_size,
+    uint8_t** output_certificate,
+    size_t* output_certificate_size)
+{
+    oe_result_t result = OE_FAILURE;
+    uint8_t* evidence_buffer = NULL;
+    size_t evidence_buffer_size = 0;
+    uint8_t* custom_claims_buffer = NULL;
+    size_t custom_claims_buffer_size = 0;
+    uint8_t* evidence_with_inittime_claims = NULL;
+    size_t evidence_with_inittime_claims_size = 0;
+
+    OE_TRACE_VERBOSE("Calling oe_get_attestation_certificate_with_evidence_v3");
+    OE_TRACE_VERBOSE(
+        "generate evidence with hash from public_key_size=%d public_key key "
+        "=\n[%s]\n",
+        public_key_size,
+        public_key);
+
+    custom_claims_buffer_size = public_key_size + runtime_claims_size;
+    custom_claims_buffer = oe_malloc(custom_claims_buffer_size);
+    if (!custom_claims_buffer)
+        OE_RAISE(OE_OUT_OF_MEMORY);
+
+    memcpy(custom_claims_buffer, public_key, public_key_size);
+    memcpy(
+        custom_claims_buffer + public_key_size,
+        runtime_claims,
+        runtime_claims_size);
+
+    result = oe_get_evidence(
+        format_id,
+        OE_EVIDENCE_FLAGS_EMBED_FORMAT_ID,
+        custom_claims_buffer,
+        custom_claims_buffer_size,
+        optional_parameters,
+        optional_parameters_size,
+        &evidence_buffer,
+        &evidence_buffer_size,
+        NULL,
+        0);
+    OE_CHECK_MSG(
+        result, "oe_get_evidence failed with %s\n", oe_result_str(result));
+
+    evidence_with_inittime_claims_size =
+        evidence_buffer_size + inittime_claims_size;
+    evidence_with_inittime_claims =
+        oe_malloc(evidence_with_inittime_claims_size);
+    if (!evidence_with_inittime_claims)
+        OE_RAISE(OE_OUT_OF_MEMORY);
+
+    memcpy(
+        evidence_with_inittime_claims, evidence_buffer, evidence_buffer_size);
+    memcpy(
+        evidence_with_inittime_claims + evidence_buffer_size,
+        inittime_claims,
+        inittime_claims_size);
+
+    result = generate_x509_self_signed_certificate(
+        oid_oe_evidence,
+        sizeof(oid_oe_evidence),
+        subject_name,
+        private_key,
+        private_key_size,
+        public_key,
+        public_key_size,
+        evidence_with_inittime_claims,
+        evidence_with_inittime_claims_size,
+        output_certificate,
+        output_certificate_size);
+    OE_CHECK_MSG(
+        result,
+        "generate_x509_self_signed_certificate failed : %s",
+        oe_result_str(result));
+
+    OE_TRACE_VERBOSE(
+        "self-signed certificate size = %d", *output_certificate_size);
+    result = OE_OK;
+
+done:
+    oe_free_evidence(evidence_buffer);
+    oe_free(custom_claims_buffer);
+    oe_free(evidence_with_inittime_claims);
+
+    return result;
+}
+
 void oe_free_attestation_certificate(uint8_t* cert)
 {
     if (cert)

@@ -155,6 +155,22 @@ extern const char* OE_OPTIONAL_CLAIMS[OE_OPTIONAL_CLAIMS_COUNT];
 #define OE_CLAIM_CUSTOM_CLAIMS_BUFFER "custom_claims_buffer"
 
 /**
+ * Init time claims in a flat buffer. Specific to
+ * oe_get_attestation_certificate_with_evidence_v3() and
+ * oe_verify_attestation_certificate_with_evidence_v3() or newer version of
+ * APIs.
+ */
+#define OE_CLAIM_INITTIME_CLAIMS_BUFFER "inittime_claims_buffer"
+
+/**
+ * Runtime claims in a flat buffer. Specific to
+ * oe_get_attestation_certificate_with_evidence_v3() and
+ * oe_verify_attestation_certificate_with_evidence_v3() or newer version of
+ * APIs.
+ */
+#define OE_CLAIM_RUNTIME_CLAIMS_BUFFER "runtime_claims_buffer"
+
+/**
  * Supported policies for validation by the verifier attestation plugin.
  * Only time is supported for now.
  */

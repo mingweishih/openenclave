@@ -11,6 +11,8 @@
 #define OE_KEY_TYPE_RSA MBEDTLS_PK_RSA
 #endif
 
+#include <openenclave/attestation/attester.h>
+#include <openenclave/attestation/sgx/evidence.h>
 #include <openenclave/attestation/verifier.h>
 #include <openenclave/edger8r/enclave.h>
 #include <openenclave/enclave.h>
@@ -22,6 +24,42 @@
 #include <string.h>
 #include "rsa.h"
 #include "tls_t.h"
+
+static const uint8_t inittime_claims[] = {
+    0x00,
+    0x01,
+    0x02,
+    0x03,
+    0x04,
+    0x05,
+    0x06,
+    0x07,
+    0x08,
+    0x09,
+    0x0a,
+    0x0b,
+    0x0c,
+    0x0d,
+    0x0e,
+    0x0f};
+
+static const uint8_t runtime_claims[] = {
+    0x00,
+    0x11,
+    0x22,
+    0x33,
+    0x44,
+    0x55,
+    0x66,
+    0x77,
+    0x88,
+    0x99,
+    0xaa,
+    0xbb,
+    0xcc,
+    0xdd,
+    0xee,
+    0xff};
 
 // This is the identity validation callback. A TLS connecting party (client or
 // server) can verify the passed in identity information to decide whether to
@@ -104,6 +142,26 @@ oe_result_t enclave_claims_verifier(
             {
                 OE_TRACE_INFO("0x%0x ", claim->value[j]);
             }
+        }
+        else if (strcmp(claim->name, OE_CLAIM_RUNTIME_CLAIMS_BUFFER) == 0)
+        {
+            OE_TRACE_INFO(
+                "Enclave %s (size: %zu):\n", claim->name, claim->value_size);
+            for (size_t j = 0; j < claim->value_size; j++)
+            {
+                OE_TRACE_INFO("0x%0x ", claim->value[j]);
+            }
+            // OE_TEST(memcmp(claim->value, runtime_claims) == 0);
+        }
+        else if (strcmp(claim->name, OE_CLAIM_INITTIME_CLAIMS_BUFFER) == 0)
+        {
+            OE_TRACE_INFO(
+                "Enclave %s (size: %zu):\n", claim->name, claim->value_size);
+            for (size_t j = 0; j < claim->value_size; j++)
+            {
+                OE_TRACE_INFO("0x%0x ", claim->value[j]);
+            }
+            // OE_TEST(memcmp(claim->value, inittime_claims) == 0);
         }
     }
 
@@ -294,18 +352,179 @@ done:
     return result;
 }
 
-oe_result_t get_tls_cert_signed_with_ec_key(
+oe_result_t get_tls_cert_signed_with_key_v3(
+    int key_type,
     unsigned char** cert,
     size_t* cert_size)
 {
-    return get_tls_cert_signed_with_key(OE_KEY_TYPE_EC, cert, cert_size);
+    oe_result_t result = OE_FAILURE;
+    uint8_t* host_cert_buf = nullptr;
+
+    uint8_t* output_certificate = nullptr;
+    size_t output_certificate_size = 0;
+
+    uint8_t* private_key = nullptr;
+    size_t private_key_size = 0;
+    uint8_t* public_key = nullptr;
+    size_t public_key_size = 0;
+
+    oe_claim_t* claims = nullptr;
+    size_t claims_length = 0;
+
+    const oe_uuid_t format = {OE_FORMAT_UUID_SGX_ECDSA};
+
+    OE_TRACE_INFO("called into enclave\n");
+
+    // generate public/private key pair
+    result = generate_key_pair(
+        key_type,
+        &public_key,
+        &public_key_size,
+        &private_key,
+        &private_key_size);
+    if (result != OE_OK)
+    {
+        OE_TRACE_ERROR(" failed with %s\n", oe_result_str(result));
+        goto done;
+    }
+    if (result != OE_OK)
+    {
+        OE_TRACE_ERROR(" failed with %s\n", oe_result_str(result));
+        goto done;
+    }
+
+    OE_TRACE_INFO("private key:[%s]\n", private_key);
+    OE_TRACE_INFO("public key:[%s]\n", public_key);
+
+    result = oe_get_attestation_certificate_with_evidence_v3(
+        &format,
+        (const unsigned char*)"CN=Open Enclave SDK,O=OESDK TLS,C=US",
+        private_key,
+        private_key_size,
+        public_key,
+        public_key_size,
+        (uint8_t*)runtime_claims,
+        sizeof(runtime_claims),
+        (uint8_t*)inittime_claims,
+        sizeof(inittime_claims),
+        NULL,
+        0,
+        &output_certificate,
+        &output_certificate_size);
+    if (result != OE_OK)
+    {
+        OE_TRACE_ERROR(" failed with %s\n", oe_result_str(result));
+        goto done;
+    }
+
+#if 0
+    OE_TRACE_INFO("output_certificate_size = 0x%x", output_certificate_size);
+    // validate cert inside the enclave
+    result = oe_verify_attestation_certificate(
+        output_certificate,
+        output_certificate_size,
+        enclave_identity_verifier,
+        nullptr);
+    OE_TRACE_INFO(
+        "\nFrom inside enclave: verifying the certificate with "
+        "oe_verify_attestation_certificate()... %s\n",
+        result == OE_OK ? "Success" : "Fail");
+
+    if (result != OE_OK)
+    {
+        goto done;
+    }
+
+    // validate cert with oe_verify_attestation_certificate_with_evidence_v2()
+    // to ensure that the added report verifier part of the function works well
+    result = oe_verify_attestation_certificate_with_evidence_v2(
+        output_certificate,
+        output_certificate_size,
+        nullptr,
+        0,
+        nullptr,
+        0,
+        &claims,
+        &claims_length);
+
+    OE_TRACE_INFO(
+        "\nFrom inside enclave: verifying the certificate with "
+        "oe_verify_attestation_certificate_with_evidence_v2()... %s\n",
+        oe_result_str(result));
+#endif
+
+    // validate cert with oe_verify_attestation_certificate_with_evidence_v2()
+    // to ensure that the added report verifier part of the function works well
+    result = oe_verify_attestation_certificate_with_evidence_v3(
+        output_certificate,
+        output_certificate_size,
+        nullptr,
+        0,
+        nullptr,
+        0,
+        &claims,
+        &claims_length);
+
+    OE_TRACE_INFO(
+        "\nFrom inside enclave: verifying the certificate with "
+        "oe_verify_attestation_certificate_with_evidence_v3()... %s\n",
+        oe_result_str(result));
+    OE_CHECK(result);
+
+    result = enclave_claims_verifier(claims, claims_length, nullptr);
+
+    OE_TRACE_INFO(
+        "\nFrom inside enclave: verifying enclave claims with "
+        "enclave_claims_verifier()... %s\n",
+        oe_result_str(result));
+
+    OE_CHECK(result);
+
+    // copy cert to host memory
+    host_cert_buf = (uint8_t*)oe_host_malloc(output_certificate_size);
+    if (host_cert_buf == nullptr)
+    {
+        result = OE_OUT_OF_MEMORY;
+        goto done;
+    }
+
+    // copy to the host for host-side validation test
+    memcpy(host_cert_buf, output_certificate, output_certificate_size);
+    *cert_size = output_certificate_size;
+    *cert = host_cert_buf;
+    OE_TRACE_INFO("*cert = %p", *cert);
+    OE_TRACE_INFO("*cert_size = 0x%x", *cert_size);
+
+done:
+    free(private_key);
+    free(public_key);
+    oe_free_attestation_certificate(output_certificate);
+    oe_free_claims(claims, claims_length);
+
+    return result;
+}
+
+oe_result_t get_tls_cert_signed_with_ec_key(
+    unsigned char** cert,
+    size_t* cert_size,
+    int api_version)
+{
+    if (api_version == 3)
+        return get_tls_cert_signed_with_key_v3(OE_KEY_TYPE_EC, cert, cert_size);
+    else
+        return get_tls_cert_signed_with_key(OE_KEY_TYPE_EC, cert, cert_size);
 }
 
 oe_result_t get_tls_cert_signed_with_rsa_key(
     unsigned char** cert,
-    size_t* cert_size)
+    size_t* cert_size,
+    int api_version)
 {
-    return get_tls_cert_signed_with_key(OE_KEY_TYPE_RSA, cert, cert_size);
+    if (api_version == 3)
+        return get_tls_cert_signed_with_key_v3(
+            OE_KEY_TYPE_RSA, cert, cert_size);
+    else
+        return get_tls_cert_signed_with_key(OE_KEY_TYPE_RSA, cert, cert_size);
 }
 
 OE_SET_ENCLAVE_SGX(
