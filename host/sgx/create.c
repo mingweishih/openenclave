@@ -59,6 +59,7 @@ static char* get_fullpath(const char* path)
 #include "cpuid.h"
 #include "enclave.h"
 #include "exception.h"
+#include "layout.h"
 #include "platform_u.h"
 #include "sgxload.h"
 #include "xstate.h"
@@ -68,6 +69,8 @@ static oe_once_type _enclave_init_once;
 
 /* Global for caching the result of AVX check used by oe_enter */
 bool oe_is_avx_enabled = false;
+
+#define OE_MMAN_PAGE_NUMBER 10
 
 static void _initialize_enclave_host_impl(void)
 {
@@ -156,6 +159,9 @@ static oe_result_t _add_filled_pages(
 
         OE_CHECK(oe_sgx_load_enclave_data(
             context, enclave->base_address, addr, src, flags, extend));
+
+        OE_CHECK(oe_sgx_add_enclave_layout_entry(enclave, addr, OE_PAGE_SIZE, flags));
+
         (*vaddr) += OE_PAGE_SIZE;
     }
 
@@ -294,6 +300,8 @@ static oe_result_t _add_control_pages(
 
             OE_CHECK(oe_sgx_load_enclave_data(
                 context, enclave->base_address, addr, src, flags, extend));
+
+            OE_CHECK(oe_sgx_add_enclave_layout_entry(enclave, addr, OE_PAGE_SIZE, flags));
         }
 
         /* Increment the page size */
@@ -304,6 +312,10 @@ static oe_result_t _add_control_pages(
     OE_CHECK(_add_filled_pages(context, enclave, vaddr, 2, 0, true));
 
     /* Skip over guard page */
+    OE_CHECK(oe_sgx_add_enclave_layout_entry(enclave,
+        enclave->start_address + *vaddr,
+        OE_PAGE_SIZE,
+        OE_SGX_EMA_PAGE_TYPE_RESERVE));
     (*vaddr) += OE_PAGE_SIZE;
 
     /* Add blank pages (for either FS segment or GS segment) */
@@ -323,24 +335,117 @@ done:
     return result;
 }
 
+static oe_result_t _add_layout_entries_pages(
+    oe_sgx_load_context_t* context,
+    oe_enclave_t* enclave,
+    uint64_t* vaddr)
+{
+    oe_result_t result = OE_FAILURE;
+
+    if (!context || !vaddr || !enclave)
+        OE_RAISE(OE_INVALID_PARAMETER);
+
+    if (enclave->layout_entries_size % OE_PAGE_SIZE)
+        OE_RAISE(OE_INVALID_PARAMETER);
+
+    size_t page_number;
+    size_t src = (uint64_t)enclave->layout_entries;
+
+    page_number = enclave->layout_entries_size / OE_PAGE_SIZE;
+
+    printf("[_add_layout_entries_pages] oe_sgx_layout_t size: %zu, layout size: %zu, page number: %zu\n",
+        sizeof(oe_sgx_enclave_layout_t),
+        enclave->layout_entries_size,
+        page_number);
+
+    for (size_t i = 0; i < page_number; i++)
+    {
+        uint64_t addr = enclave->start_address + *vaddr;
+        uint64_t flags = SGX_SECINFO_REG | SGX_SECINFO_R;
+        bool extend = true;
+
+        OE_CHECK(oe_sgx_add_enclave_layout_entry(enclave, addr, OE_PAGE_SIZE, flags));
+
+        OE_CHECK(oe_sgx_load_enclave_data(
+            context, enclave->base_address, addr, src, flags, extend));
+
+        src += OE_PAGE_SIZE;
+        (*vaddr) += OE_PAGE_SIZE;
+    }
+
+    result = OE_OK;
+
+done:
+    return result;
+}
+
+static oe_result_t _add_mman_pages(
+    oe_sgx_load_context_t* context,
+    oe_enclave_t* enclave,
+    uint64_t* vaddr)
+{
+    oe_result_t result = OE_FAILURE;
+    oe_page_t* page = NULL;
+
+    page = oe_memalign(OE_PAGE_SIZE, sizeof(oe_page_t));
+    if (!page)
+        OE_RAISE(OE_OUT_OF_MEMORY);
+
+    if (!context || !vaddr || !enclave)
+        OE_RAISE(OE_INVALID_PARAMETER);
+
+    if (enclave->layout_entries_size % OE_PAGE_SIZE)
+        OE_RAISE(OE_INVALID_PARAMETER);
+
+    size_t page_number;
+    size_t src = (uint64_t)page;
+
+    page_number = OE_MMAN_PAGE_NUMBER;
+
+    for (size_t i = 0; i < page_number; i++)
+    {
+        uint64_t addr = enclave->start_address + *vaddr;
+        uint64_t flags = SGX_SECINFO_REG | SGX_SECINFO_W | SGX_SECINFO_R;
+        bool extend = true;
+
+        OE_CHECK(oe_sgx_load_enclave_data(
+            context, enclave->base_address, addr, src, flags, extend));
+
+        (*vaddr) += OE_PAGE_SIZE;
+    }
+
+    result = OE_OK;
+
+done:
+    return result;
+}
+
 static oe_result_t _calculate_enclave_size(
     size_t image_size,
     size_t tls_page_count,
     const oe_sgx_enclave_properties_t* props,
     size_t* loaded_enclave_pages_size,
-    size_t* enclave_size)
+    size_t* enclave_size,
+    size_t* enclave_layout_entries_size)
 {
     oe_result_t result = OE_UNEXPECTED;
     size_t heap_size;
     size_t stack_size;
     size_t tls_size;
     size_t control_size;
+    size_t mman_size;
+    size_t layout_entreis_size;
+    size_t total_size;
     const oe_enclave_size_settings_t* size_settings;
 
     size_settings = &props->header.size_settings;
 
     if (enclave_size)
         *enclave_size = 0;
+
+    if (enclave_layout_entries_size)
+        *enclave_layout_entries_size = 0;
+
     *loaded_enclave_pages_size = 0;
 
     /* Compute size in bytes of the heap */
@@ -358,10 +463,18 @@ static oe_result_t _calculate_enclave_size(
     control_size = (OE_SGX_TCS_CONTROL_PAGES + OE_SGX_TCS_THREAD_DATA_PAGES) *
                    OE_PAGE_SIZE;
 
+    mman_size = OE_MMAN_PAGE_NUMBER * OE_PAGE_SIZE;
+
     /* Compute end of the enclave */
-    *loaded_enclave_pages_size =
+    total_size =
         image_size + heap_size +
-        (size_settings->num_tcs * (stack_size + tls_size + control_size));
+        (size_settings->num_tcs * (stack_size + tls_size + control_size))
+        + mman_size;
+
+    layout_entreis_size =
+        oe_round_up_to_page_size(total_size / OE_PAGE_SIZE * sizeof(oe_sgx_enclave_layout_t));
+
+    *loaded_enclave_pages_size = total_size + layout_entreis_size;
 
     if (enclave_size)
     {
@@ -373,6 +486,9 @@ static oe_result_t _calculate_enclave_size(
             /* Calculate the total size of the enclave */
             *enclave_size = oe_round_u64_to_pow2(*loaded_enclave_pages_size);
     }
+
+    if (enclave_layout_entries_size)
+        *enclave_layout_entries_size = layout_entreis_size;
 
     result = OE_OK;
     return result;
@@ -399,6 +515,10 @@ static oe_result_t _add_data_pages(
     for (i = 0; i < size_settings->num_tcs; i++)
     {
         /* Add guard page */
+        OE_CHECK(oe_sgx_add_enclave_layout_entry(enclave,
+            enclave->start_address + *vaddr,
+            OE_PAGE_SIZE,
+            OE_SGX_EMA_PAGE_TYPE_RESERVE));
         *vaddr += OE_PAGE_SIZE;
 
         /* Add the stack for this thread control structure */
@@ -406,12 +526,20 @@ static oe_result_t _add_data_pages(
             context, enclave, vaddr, size_settings->num_stack_pages));
 
         /* Add guard page */
+        OE_CHECK(oe_sgx_add_enclave_layout_entry(enclave,
+            enclave->start_address + *vaddr,
+            OE_PAGE_SIZE,
+            OE_SGX_EMA_PAGE_TYPE_RESERVE));
         *vaddr += OE_PAGE_SIZE;
 
         /* Add the "control" pages */
         OE_CHECK(
             _add_control_pages(context, entry, tls_page_count, vaddr, enclave));
     }
+
+    OE_CHECK(_add_mman_pages(context, enclave, vaddr));
+
+    OE_CHECK(_add_layout_entries_pages(context, enclave, vaddr));
 
     result = OE_OK;
 
@@ -808,8 +936,10 @@ oe_result_t oe_sgx_build_enclave(
     uint64_t enclave_addr = 0;
     oe_enclave_image_t oeimage;
     void* ecall_data = NULL;
-    size_t image_size;
-    size_t tls_page_count;
+    size_t image_size = 0;
+    size_t tls_page_count = 0;
+    size_t layout_entreis_size = 0;
+    size_t layout_entreis_offest = 0;
     uint64_t vaddr = 0;
     oe_sgx_enclave_properties_t props;
 
@@ -906,7 +1036,8 @@ oe_result_t oe_sgx_build_enclave(
         tls_page_count,
         &props,
         &loaded_enclave_pages_size,
-        &enclave_size));
+        &enclave_size,
+        &layout_entreis_size));
 
     /* Check if the enclave is configured with CapturePFGPExceptions=1 */
     if (props.config.flags.capture_pf_gp_exceptions)
@@ -973,8 +1104,23 @@ oe_result_t oe_sgx_build_enclave(
                                 : enclave_addr;
     enclave->size = enclave_size;
 
+    if (layout_entreis_size)
+    {
+        enclave->layout_entries = (oe_sgx_enclave_layout_t*)oe_memalign(OE_PAGE_SIZE, layout_entreis_size);
+        if (!enclave->layout_entries)
+            OE_RAISE(OE_OUT_OF_MEMORY);
+
+        enclave->layout_entries_size = layout_entreis_size;
+
+        OE_CHECK(oe_safe_sub_u64(loaded_enclave_pages_size, layout_entreis_size, &layout_entreis_offest));
+    }
+
     /* Patch image */
-    OE_CHECK(oeimage.sgx_patch(&oeimage, enclave_size));
+    OE_CHECK(oeimage.sgx_patch(
+        &oeimage,
+        enclave_size,
+        layout_entreis_offest,
+        layout_entreis_size));
 
     /* Add image to enclave */
     OE_CHECK(oeimage.add_pages(&oeimage, context, enclave, &vaddr));
@@ -1063,6 +1209,13 @@ done:
 
     if (ecall_data)
         free(ecall_data);
+
+    if (enclave->layout_entries)
+    {
+        free(enclave->layout_entries);
+        enclave->layout_entries = NULL;
+        enclave->layout_entries_size = 0;
+    }
 
     oe_unload_enclave_image(&oeimage);
 

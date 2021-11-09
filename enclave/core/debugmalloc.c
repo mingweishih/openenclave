@@ -19,7 +19,8 @@
 #include <openenclave/internal/utils.h>
 
 /* Flags to control runtime behavior. */
-bool oe_use_debug_malloc = true;
+//bool oe_use_debug_malloc = true;
+bool oe_use_debug_malloc = false;
 bool oe_use_debug_malloc_memset = true;
 
 /* Flags to define the local tracking state. */

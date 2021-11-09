@@ -111,7 +111,11 @@ struct _oe_enclave_image
         oe_enclave_t* enclave,
         uint64_t* vaddr);
 
-    oe_result_t (*sgx_patch)(oe_enclave_image_t* image, size_t enclave_size);
+    oe_result_t (*sgx_patch)(
+        oe_enclave_image_t* image,
+        size_t enclave_size,
+        size_t layout_entries_offset,
+        size_t layout_entries_size);
 
     oe_result_t (*sgx_get_debug_modules)(
         oe_enclave_image_t* image,
