@@ -1099,7 +1099,7 @@ static oe_result_t _add_dynamic_section_relocations(
     {
         if (dynamic[i].d_tag == DT_STRTAB || dynamic[i].d_tag == DT_SYMTAB ||
             dynamic[i].d_tag == DT_RELA || dynamic[i].d_tag == DT_GNU_HASH ||
-            dynamic[i].d_tag == DT_VERSYM)
+            dynamic[i].d_tag == DT_VERSYM || dynamic[i].d_tag == DT_PLTGOT)
             number_of_entries++;
     }
 
@@ -1121,7 +1121,7 @@ static oe_result_t _add_dynamic_section_relocations(
     {
         if (dynamic[i].d_tag == DT_STRTAB || dynamic[i].d_tag == DT_SYMTAB ||
             dynamic[i].d_tag == DT_RELA || dynamic[i].d_tag == DT_GNU_HASH ||
-            dynamic[i].d_tag == DT_VERSYM)
+            dynamic[i].d_tag == DT_VERSYM || dynamic[i].d_tag == DT_PLTGOT)
         {
             uint64_t offset;
             uint64_t append;
