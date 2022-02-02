@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include "linux/vdso.h"
 #elif defined(_WIN32)
 #include <Windows.h>
 #else
@@ -49,6 +50,8 @@
 
 static oe_once_type _thread_binding_once;
 static oe_thread_key _thread_binding_key;
+
+oe_result_t test_vdso(vdso_sgx_enter_enclave_t *vdso_pointer);
 
 static void _create_thread_binding_key(void)
 {
@@ -177,6 +180,16 @@ static oe_result_t _do_eenter(
         code_in,
         func_in,
         OE_LLX(arg_in));
+
+    vdso_sgx_enter_enclave_t pointer;
+    if (test_vdso(&pointer) == OE_OK)
+    {
+        printf("vsdo addr: 0x%lx\n", (uint64_t)pointer);
+    }
+    else
+    {
+        printf("fail to get vdso\n");
+    }
 
     /* Call oe_enter() assembly function (enter.S) */
     {

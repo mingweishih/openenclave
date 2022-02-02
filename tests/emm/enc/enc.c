@@ -157,6 +157,10 @@ void dump_layout_entries()
 
     oe_sgx_enclave_layout_t* layout_entries = (oe_sgx_enclave_layout_t*)__oe_get_layout_entries_base();
 
+    oe_host_printf("[enclave range] 0x%lx - 0x%lx\n",
+                   (uint64_t)__oe_get_enclave_base_address(),
+                   (uint64_t)__oe_get_enclave_base_address() + __oe_get_enclave_size());
+
     for (size_t i = 0; i < entries_count; i++)
     {
         if (!layout_entries[i].address)
@@ -199,6 +203,8 @@ void test_emm()
 
     oe_host_printf("test sgx_mm_alloc\n");
 
+    //while(1)
+    {
     ret = sgx_mm_alloc(NULL, PAGE_SIZE, SGX_EMA_COMMIT_NOW, NULL, NULL, &addr);
 
     oe_host_printf("test sgx_mm_alloc returned=%d\n", ret);
@@ -215,7 +221,7 @@ void test_emm()
         abort();
     }
 
-    oe_host_printf("test sgx_mm_alloc succeeded\n");
+    oe_host_printf("test sgx_mm_alloc succeeded: addr=0x%lx\n", (uint64_t)addr);
 
     uint8_t* data = (uint8_t*)addr;
     data[0] = 10;
@@ -227,6 +233,7 @@ void test_emm()
         oe_host_printf("sgx_mm_modify_permissions failed %d\n", ret);
 
     //data[0] = 20;
+    }
 }
 
 int enc_emm()

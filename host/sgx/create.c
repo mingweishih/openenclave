@@ -64,13 +64,13 @@ static char* get_fullpath(const char* path)
 #include "sgxload.h"
 #include "xstate.h"
 
+#define OE_MMAN_PAGE_NUMBER 10
+
 #if !defined(OEHOSTMR)
 static oe_once_type _enclave_init_once;
 
 /* Global for caching the result of AVX check used by oe_enter */
 bool oe_is_avx_enabled = false;
-
-#define OE_MMAN_PAGE_NUMBER 10
 
 static void _initialize_enclave_host_impl(void)
 {
@@ -398,18 +398,18 @@ static oe_result_t _add_mman_pages(
         OE_RAISE(OE_INVALID_PARAMETER);
 
     size_t page_number;
-    size_t src = (uint64_t)page;
+    //size_t src = (uint64_t)page;
 
     page_number = OE_MMAN_PAGE_NUMBER;
 
     for (size_t i = 0; i < page_number; i++)
     {
-        uint64_t addr = enclave->start_address + *vaddr;
+        /*uint64_t addr = enclave->start_address + *vaddr;
         uint64_t flags = SGX_SECINFO_REG | SGX_SECINFO_W | SGX_SECINFO_R;
         bool extend = true;
 
         OE_CHECK(oe_sgx_load_enclave_data(
-            context, enclave->base_address, addr, src, flags, extend));
+            context, enclave->base_address, addr, src, flags, extend));*/
 
         (*vaddr) += OE_PAGE_SIZE;
     }

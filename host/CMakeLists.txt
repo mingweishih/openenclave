@@ -262,6 +262,7 @@ if (OE_SGX)
       sgx/linux/sgxioctl.c
       sgx/linux/switchless.c
       sgx/linux/sgxquoteexloader.c
+      sgx/linux/vdso.c
       sgx/linux/xstate.c)
   else ()
     list(APPEND PLATFORM_HOST_ONLY_SRC sgx/windows/sgxquoteproviderloader.c

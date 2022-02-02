@@ -51,6 +51,7 @@ if (OE_SGX)
     ${PROJECT_SOURCE_DIR}/common/sgx/sgxmeasure.c
     sgx/create.c
     sgx/elf.c
+    sgx/layout.c
     sgx/load.c
     sgx/loadelf.c
     sgx/sgxload.c
