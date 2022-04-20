@@ -38,7 +38,10 @@ uint64_t test_pfgp_handler(oe_exception_record_t* exception_record)
     return OE_EXCEPTION_CONTINUE_EXECUTION;
 }
 
-int enc_pf_gp_exceptions(int is_misc_region_supported, int is_on_windows)
+int enc_pf_gp_exceptions(
+    int is_misc_region_supported,
+    int is_on_windows,
+    int is_vdso_enabled)
 {
     /* Skip PF simulation on Windows */
     if (is_on_windows && !is_misc_region_supported)
@@ -46,6 +49,11 @@ int enc_pf_gp_exceptions(int is_misc_region_supported, int is_on_windows)
 
     /* For SGX1 enclaves, the PF simulation is only supported in debug mode */
     if (!is_misc_region_supported && !is_enclave_debug_allowed())
+        return 2;
+
+    /* For SGX1 enclaves, the PF simulation is only supported when vDSO is not
+     * enabled */
+    if (!is_misc_region_supported && is_vdso_enabled)
         return 2;
 
     if (oe_add_vectored_exception_handler(false, test_pfgp_handler) != OE_OK)

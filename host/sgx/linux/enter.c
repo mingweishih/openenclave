@@ -6,9 +6,18 @@
 #include <openenclave/internal/constants_x64.h>
 #include <openenclave/internal/registers.h>
 #include <openenclave/internal/sgx/ecall_context.h>
-#include "asmdefs.h"
-#include "enclave.h"
-#include "xstate.h"
+#include "../asmdefs.h"
+#include "../enclave.h"
+#include "../vdso.h"
+#include "../xstate.h"
+
+/* Note: The code was originally made to work on both Linux and Windows.
+ * Given that the diversity increases with the support of vDSO, we make
+ * the copy of the code to each OS, sgx/linux/enter.c and sgx/windows/enter.c,
+ * and apply vDSO-related changes to the former while leave the latter
+ * mostly untouched. Doing so also avoids breaking the debugging contract
+ * on Windows, which requires careful review before we want to merge
+ * the two implementation again. */
 
 // Define a variable with given name and bind it to the register with the
 // corresponding name. This allows manipulating the register as a normal
@@ -17,33 +26,12 @@
 #define OE_DEFINE_REGISTER(regname, value) \
     register uint64_t regname __asm__(#regname) = (uint64_t)(value)
 
-#if _WIN32
-
-// In x64 Windows ABI, the frame pointer can be any register and the frame
-// pointer points to a constant location *within* the frame. In x64, the
-// frame pointer points to the top of the frame. Windows debugger extensions
-// for Open Enclave SDK require a linux-style frame pointer for the oe_enter
-// function on the host-side.
-#define OE_DEFINE_FRAME_POINTER(r, v) OE_DEFINE_REGISTER(r, v)
-
-// As per Windows x64 ABI, the linux style frame pointer is -0x40 bytes
-// from the address of the enclave parameter which is passed via the stack.
-// Enclave parameter is the 7th parameter. Including the return-address, the
-// Linux style frame-pointer is -(7+1)*8 = -64 = -0x40 bytes from the enclave
-// parameter in the stack.
-#define OE_FRAME_POINTER_VALUE ((uint64_t)&enclave - 0x40)
-#define OE_FRAME_POINTER , "r"(rbp)
-
-#elif __linux__
-
 // The debugger requires a Linux x64 ABI frame pointer for stack walking.
 // Therefore, this file must be compiled with -fno-omit-frame-pointer.
 // Nothing else needs to be done and the macros below are noops.
 #define OE_DEFINE_FRAME_POINTER(r, v) OE_UNUSED(v)
 #define OE_FRAME_POINTER_VALUE 0
 #define OE_FRAME_POINTER
-
-#endif
 
 // The following registers are inputs to ENCLU instruction. They are also
 // clobbered and hence are marked as +r.
@@ -65,26 +53,14 @@
     "r10", "r11", "r12", "r13", "r14", "r15", "xmm6", "xmm7", "xmm8", "xmm9", \
         "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
 
-#define OE_VZEROUPPER              \
-    asm volatile("vzeroupper \n\t" \
-                 :                 \
-                 :                 \
-                 : "ymm0",         \
-                   "ymm1",         \
-                   "ymm2",         \
-                   "ymm3",         \
-                   "ymm4",         \
-                   "ymm5",         \
-                   "ymm6",         \
-                   "ymm7",         \
-                   "ymm8",         \
-                   "ymm9",         \
-                   "ymm10",        \
-                   "ymm11",        \
-                   "ymm12",        \
-                   "ymm13",        \
-                   "ymm14",        \
-                   "ymm15")
+/* Forward declaration */
+oe_result_t _oe_vdso_enter(
+    void* tcs,
+    uint64_t arg1,
+    uint64_t arg2,
+    uint64_t* arg3,
+    uint64_t* arg4,
+    oe_enclave_t* enclave);
 
 // The following function must not be inlined and must have a frame-pointer
 // so that the frame can be manipulated to stitch the ocall stack.
@@ -128,21 +104,17 @@ int __oe_host_stack_bridge(
 
     return ret;
 }
-
-/**
- * Size of ocall buffers passed in ecall_contexts. Large enough for most ocalls.
- * If an ocall requires more than this size, then the enclave will make an
- * ocall to allocate the buffer instead of using the ecall_context's buffer.
- * Note: Currently, quotes are about 10KB.
- */
-#define OE_DEFAULT_OCALL_BUFFER_SIZE (16 * 1024)
-
 /**
  * Setup the ecall_context.
+ * This function should never be inline so that it can record the
+ * caller's stack frame. The stack frame information is used to stitch
+ * the stack upon an enclave entry when vDSO is used.
  */
-OE_INLINE void _setup_ecall_context(oe_ecall_context_t* ecall_context)
+OE_NEVER_INLINE
+void oe_setup_ecall_context(oe_ecall_context_t* ecall_context)
 {
     oe_thread_binding_t* binding = oe_get_thread_binding();
+
     if (binding->ocall_buffer == NULL)
     {
         // Lazily allocate buffer for making ocalls. Bound to the tcs.
@@ -150,12 +122,23 @@ OE_INLINE void _setup_ecall_context(oe_ecall_context_t* ecall_context)
         binding->ocall_buffer = malloc(OE_DEFAULT_OCALL_BUFFER_SIZE);
         binding->ocall_buffer_size = OE_DEFAULT_OCALL_BUFFER_SIZE;
     }
+
     ecall_context->ocall_buffer = binding->ocall_buffer;
     ecall_context->ocall_buffer_size = binding->ocall_buffer_size;
+
+    /* Record caller's stack frame if vDSO is used */
+    if (oe_sgx_is_vdso_enabled)
+    {
+        uint64_t* caller_frame = __builtin_frame_address(1);
+        ecall_context->debug_eenter_rbp = caller_frame[0];
+        ecall_context->debug_eenter_rip = caller_frame[1];
+    }
 }
 
 /**
- * oe_enter Executes the ENCLU instruction and transfers control to the enclave.
+ * _enter_impl: Executes the ENCLU instruction and transfers control to the
+ * enclave. The function should always be inline to share the same stack
+ * frame as oe_enter.
  *
  * The ENCLU instruction has the following contract:
  * EENTER(RBX=TCS, RCX=AEP, RDX=ECALL_CONTEXT, RDI=ARG1, RSI=ARG2) contract
@@ -177,8 +160,7 @@ OE_INLINE void _setup_ecall_context(oe_ecall_context_t* ecall_context)
  * The general purpose callee-saved registers and XMM registers are listed in
  * OE_ENCLU_CLOBBERED_REGISTERS.
  */
-OE_NEVER_INLINE
-void oe_enter(
+OE_INLINE oe_result_t _enter_impl(
     void* tcs,
     uint64_t aep,
     uint64_t arg1,
@@ -192,8 +174,8 @@ void oe_enter(
     uint32_t mxcsr = 0;
     uint16_t fcw = 0;
 
-    oe_ecall_context_t ecall_context = {{0}};
-    _setup_ecall_context(&ecall_context);
+    oe_ecall_context_t ecall_context = {0};
+    oe_setup_ecall_context(&ecall_context);
 
     while (1)
     {
@@ -245,10 +227,12 @@ void oe_enter(
 
     *arg3 = arg1;
     *arg4 = arg2;
+
+    return OE_OK;
 }
 
 /**
- * oe_enter_sim Simulates the ENCLU instruction.
+ * _enter_sim_impl: Simulates the ENCLU instruction.
  *
  * See oe_enter above for ENCLU instruction's contract.
  * For simulation, the contract is modified as below:
@@ -257,8 +241,7 @@ void oe_enter(
  *  - The address of the enclave entry point is fetched from the tcs
  *    (offset 72) and the control is transferred to it via a jmp
  */
-OE_NEVER_INLINE
-void oe_enter_sim(
+OE_INLINE oe_result_t _enter_sim_impl(
     void* tcs,
     uint64_t aep,
     uint64_t arg1,
@@ -279,8 +262,8 @@ void oe_enter_sim(
     void* host_fs = oe_get_fs_register_base();
     void* host_gs = oe_get_gs_register_base();
     sgx_tcs_t* sgx_tcs = (sgx_tcs_t*)tcs;
-    oe_ecall_context_t ecall_context = {{0}};
-    _setup_ecall_context(&ecall_context);
+    oe_ecall_context_t ecall_context = {0};
+    oe_setup_ecall_context(&ecall_context);
 
     while (1)
     {
@@ -361,4 +344,32 @@ void oe_enter_sim(
 
     *arg3 = arg1;
     *arg4 = arg2;
+
+    return OE_OK;
+}
+
+/* The entry point for actual implementations of enclave entering logic.
+ * This allows us to alias the symbol name (oe_enter) to __morestack such
+ * that GDB can correctly walk the stack frames even when the stack does
+ * not monotonically decrease after host-encalve context switches. */
+OE_NEVER_INLINE
+oe_result_t oe_enter(
+    void* tcs,
+    uint64_t aep,
+    uint64_t arg1,
+    uint64_t arg2,
+    uint64_t* arg3,
+    uint64_t* arg4,
+    oe_enclave_t* enclave)
+{
+    oe_result_t result;
+
+    if (enclave->simulate)
+        result = _enter_sim_impl(tcs, aep, arg1, arg2, arg3, arg4, enclave);
+    else if (!oe_sgx_is_vdso_enabled)
+        result = _enter_impl(tcs, aep, arg1, arg2, arg3, arg4, enclave);
+    else
+        result = oe_vdso_enter(tcs, arg1, arg2, arg3, arg4, enclave);
+
+    return result;
 }

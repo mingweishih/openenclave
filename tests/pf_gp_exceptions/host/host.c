@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "../host/sgx/cpuid.h"
+#include "../host/sgx/vdso.h"
 #include "pf_gp_exceptions_u.h"
 
 #ifdef _WIN32
@@ -61,7 +62,11 @@ int main(int argc, const char* argv[])
     else
     {
         result = enc_pf_gp_exceptions(
-            enclave, &return_value, is_misc_region_supported, is_on_windows);
+            enclave,
+            &return_value,
+            is_misc_region_supported,
+            is_on_windows,
+            oe_sgx_is_vdso_enabled);
         if (result != OE_OK)
             oe_put_err("oe_call_enclave() failed: result=%u", result);
 
