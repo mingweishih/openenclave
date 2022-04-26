@@ -108,6 +108,14 @@ typedef struct _thread_binding
 /* Get thread data from thread-specific data (TSD) */
 oe_thread_binding_t* oe_get_thread_binding(void);
 
+typedef struct _oe_sgx_enclave_layout
+{
+    uint64_t address;
+    uint64_t size;
+    uint64_t type;
+    uint64_t permission;
+} oe_sgx_enclave_layout_t;
+
 /**
  * Host-side representation of properties associated with each
  * enclave instance.
@@ -159,6 +167,11 @@ typedef struct _oe_enclave
     oe_ecall_id_t* ecall_id_table;
     size_t ecall_id_table_size;
     size_t num_ecalls;
+
+    /* Enclave layout information */
+    oe_sgx_enclave_layout_t* layout_entries;
+    size_t layout_entries_size;
+
 } oe_enclave_t;
 
 /* Get the event for the given TCS */

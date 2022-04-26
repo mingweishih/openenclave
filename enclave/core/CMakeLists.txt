@@ -62,6 +62,7 @@ if (OE_SGX)
     sgx/backtrace.c
     sgx/calls.c
     sgx/cpuid.c
+    sgx/edmm.S
     sgx/enter.S
     sgx/entropy.c
     sgx/errno.c

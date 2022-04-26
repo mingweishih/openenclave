@@ -223,6 +223,7 @@ if (UNIX)
       # platforms.
       add_subdirectory(sgx_zerobase) # Disabled until PSW update
     endif ()
+    add_subdirectory(emm)
   endif ()
   add_subdirectory(libc)
 endif ()

@@ -21,6 +21,8 @@ typedef struct _oe_sgx_enclave_image_info_t
     uint64_t oeinfo_size;
     uint64_t reloc_rva;
     uint64_t reloc_size;
+    uint64_t layout_entries_rva;
+    uint64_t layout_entries_size;
     uint64_t heap_rva; /* heap size is in header.sizesettings */
     uint64_t enclave_size;
 } oe_sgx_enclave_image_info_t;
@@ -72,7 +74,7 @@ typedef struct _oe_sgx_enclave_properties
     /* (96) */
     oe_sgx_enclave_image_info_t image_info;
 
-    /* (144)  */
+    /* (160)  */
     uint8_t sigstruct[OE_SGX_SIGSTRUCT_SIZE];
 
     /* (1960) end-marker to make sure 0-filled signstruct doesn't get omitted */

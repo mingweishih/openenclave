@@ -69,7 +69,7 @@
 // Open Enclave structure-specific offset definitions.
 //
 
-#define OE_SGX_ENCLAVE_SIZE_OFFSET 0x88
+#define OE_SGX_ENCLAVE_SIZE_OFFSET 0x98
 
 //
 // XSTATE constants.

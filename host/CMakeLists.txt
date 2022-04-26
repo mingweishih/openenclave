@@ -220,6 +220,7 @@ if (OE_SGX)
     ${PROJECT_SOURCE_DIR}/common/sgx/tlsverifier.c
     ${PROJECT_SOURCE_DIR}/common/sgx/verifier.c
     sgx/hostverify_report.c
+    sgx/layout.c
     sgx/report_common.c
     sgx/sgxquoteprovider.c
     sgx/quote.c
