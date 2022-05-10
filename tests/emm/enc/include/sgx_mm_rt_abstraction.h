@@ -94,7 +94,7 @@ extern "C" {
  * @retval EINVAL Any parameter passed in is not valid.
  * @retval errno Error as reported by dependent syscalls, e.g., mmap().
  */
-    //int sgx_mm_alloc_ocall(uint64_t addr, size_t length, int flags);
+    int sgx_mm_alloc_ocall(uint64_t addr, size_t length, int flags);
 
     /*
  * Call OS to change permissions, type, or notify EACCEPT done after TRIM.
@@ -121,16 +121,16 @@ extern "C" {
  * @retval errno Error as reported by dependent syscalls, e.g., mprotect().
  */
 
-  //  int sgx_mm_modify_ocall(uint64_t addr, size_t length, int flags_from, int flags_to);
+    int sgx_mm_modify_ocall(uint64_t addr, size_t length, int flags_from, int flags_to);
 
     /*
  * Define a mutex and init/lock/unlock/destroy functions.
  */
-  //  typedef struct _sgx_mm_mutex sgx_mm_mutex;
-  //  sgx_mm_mutex* sgx_mm_mutex_create(void);
-  //  int sgx_mm_mutex_lock(sgx_mm_mutex *mutex);
-  //  int sgx_mm_mutex_unlock(sgx_mm_mutex *mutex);
-  //  int sgx_mm_mutex_destroy(sgx_mm_mutex *mutex);
+    typedef struct _sgx_mm_mutex sgx_mm_mutex;
+    sgx_mm_mutex* sgx_mm_mutex_create(void);
+    int sgx_mm_mutex_lock(sgx_mm_mutex *mutex);
+    int sgx_mm_mutex_unlock(sgx_mm_mutex *mutex);
+    int sgx_mm_mutex_destroy(sgx_mm_mutex *mutex);
 
     /*
  * Check whether the given buffer is strictly within the enclave.
@@ -148,7 +148,7 @@ extern "C" {
  * causes arithmetic operations to wrap.
  *
  */
- //   bool sgx_mm_is_within_enclave(const void *ptr, size_t size);
+    bool sgx_mm_is_within_enclave(const void *ptr, size_t size);
 
 
 #define SGX_EMA_SYSTEM SGX_EMA_ALLOC_FLAGS(0x80UL) /* EMA reserved by system */

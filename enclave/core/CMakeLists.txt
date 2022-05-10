@@ -63,6 +63,7 @@ if (OE_SGX)
     sgx/calls.c
     sgx/cpuid.c
     sgx/edmm.S
+    sgx/edmm.c
     sgx/enter.S
     sgx/entropy.c
     sgx/errno.c
@@ -213,6 +214,9 @@ maybe_build_using_clangw(oecore)
 add_enclave_dependencies(oecore core_trusted_edl)
 if (OE_SGX)
   add_enclave_dependencies(oecore platform_trusted_edl)
+
+  enclave_include_directories(
+    oecore PRIVATE ${PROJECT_SOURCE_DIR}/include/openenclave/corelibc)
 endif ()
 
 enclave_include_directories(oecore PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

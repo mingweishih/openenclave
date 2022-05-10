@@ -11,6 +11,8 @@
 
 #include "emm_t.h"
 
+#define _sgx_mm_mutex _oe_pthread_mutex
+
 #include "sgx_mm.h"
 #include "sgx_mm_primitives.h"
 #include "sgx_mm_rt_abstraction.h"
@@ -18,6 +20,9 @@
 
 #define PAGE_SIZE 4096
 
+void oe_emm_init();
+
+#if 0
 typedef struct _oe_sgx_enclave_layout
 {
     uint64_t address;
@@ -28,53 +33,29 @@ typedef struct _oe_sgx_enclave_layout
 
 void sgx_mm_init();
 
-int oe_eaccept(const sec_info_t*, size_t);
-int oe_eacceptcopy(const sec_info_t*, size_t, size_t);
-int oe_emodpe(const sec_info_t*, size_t);
-
-int do_eaccept(const sec_info_t* sec_info, size_t addr)
-{
-    oe_host_printf("[do_eaccept] sec_info=@0x%lx, addr=0x%lx\n",
-                   (uint64_t)sec_info, addr);
-    int ret = oe_eaccept(sec_info, addr);
-
-    if (ret != 0)
-        oe_host_printf("eaccept failed, ret=%d\n", ret);
-
-    return ret;
-}
-
-int do_eacceptcopy(const sec_info_t* sec_info, size_t dst, size_t src)
-{
-    oe_host_printf("[do_eacceptcopy] sec_info=@0x%lx, dst=0x%lx, src=0x%lx\n",
-                   (uint64_t)sec_info, dst, src);
-
-    int ret = oe_eacceptcopy(sec_info, dst, src);
-
-    if (ret != 0)
-        oe_host_printf("eacceptcopy failed, ret=%d\n", ret);
-
-    return ret;
-}
-
-int do_emodpe(const sec_info_t* sec_info, size_t addr)
-{
-    oe_host_printf("[do_emodpe] sec_info=@0x%lx, addr=0x%lx\n",
-                   (uint64_t)sec_info, addr);
-
-    return oe_emodpe(sec_info, addr);
-}
-
-bool sgx_mm_is_within_enclave(const void* addr, size_t size)
-{
-    return oe_is_within_enclave(addr, size);
-}
-
 typedef int (*sgx_mm_pfhandler_t)(const sgx_pfinfo *pfinfo);
+static sgx_mm_pfhandler_t _global_handler;
+
+static uint64_t _oe_handler(oe_exception_record_t* record)
+{
+    sgx_pfinfo info = {0};
+
+    if (record->code == OE_EXCEPTION_PAGE_FAULT)
+    {
+        info.maddr = record->faulting_address;
+        memcpy(&info.pfec, &record->error_code, sizeof(uint32_t));
+        //oe_host_printf("_oe_handler is triggered by #PF, addr=0x%lx\n", info.maddr);
+        _global_handler(&info);
+    }
+
+    return OE_EXCEPTION_CONTINUE_EXECUTION;
+}
 
 bool sgx_mm_register_pfhandler(sgx_mm_pfhandler_t pfhandler)
 {
-    (void)(pfhandler);
+    oe_host_printf("sgx_mm_register_pfhandler\n");
+    _global_handler = pfhandler;
+    oe_add_vectored_exception_handler(false, _oe_handler);
     return true;
 }
 
@@ -83,73 +64,6 @@ bool sgx_mm_unregister_pfhandler(sgx_mm_pfhandler_t pfhandler)
     (void)(pfhandler);
     return true;
 }
-
-typedef oe_pthread_mutex_t sgx_mm_mutex;
-
-sgx_mm_mutex *sgx_mm_mutex_create(void)
-{
-    sgx_mm_mutex *m = (sgx_mm_mutex*)malloc(sizeof(sgx_mm_mutex));
-
-    if (!m)
-        abort();
-
-    oe_pthread_mutex_init(m, NULL);
-
-    return m;
-}
-
-int sgx_mm_mutex_lock(sgx_mm_mutex *mutex)
-{
-    int ret = oe_pthread_mutex_lock(mutex);
-
-    if (!mutex)
-        oe_host_printf("sgx_mm_mutex_lock failed with NULL mutex\n");
-
-    return ret;
-}
-
-int sgx_mm_mutex_unlock(sgx_mm_mutex *mutex)
-{
-    int ret = oe_pthread_mutex_unlock(mutex);
-
-    return ret;
-}
-
-int sgx_mm_mutex_destroy(sgx_mm_mutex *mutex)
-{
-    int ret = oe_pthread_mutex_destroy(mutex);
-
-    free(mutex);
-    return ret;
-}
-
-int sgx_mm_alloc_ocall(uint64_t addr, size_t length, int flags)
-{
-    int ret;
-
-    if (oe_sgx_mm_alloc_ocall(&ret, addr, length, flags) != OE_OK)
-    {
-        oe_host_printf("sgx_mm_alloc_ocall failed\n");
-        abort();
-    }
-
-    return ret;
-}
-
-int sgx_mm_modify_ocall(uint64_t addr, size_t length, int flags_from, int flags_to)
-{
-    int ret;
-
-    if (oe_sgx_mm_modify_ocall(&ret, addr, length, flags_from, flags_to) != OE_OK)
-    {
-        oe_host_printf("sgx_mm_modify_ocall failed\n");
-        abort();
-    }
-
-    return ret;
-
-}
-
 
 void dump_layout_entries()
 {
@@ -183,6 +97,7 @@ void dump_layout_entries()
         }
     }
 }
+#endif
 
 void test_emm()
 {
@@ -230,21 +145,80 @@ void test_emm()
 
     ret = sgx_mm_modify_permissions(addr, PAGE_SIZE, SGX_EMA_PROT_NONE);
     if (ret != 0)
-        oe_host_printf("sgx_mm_modify_permissions failed %d\n", ret);
+        oe_host_printf("sgx_mm_modify_permissions to NONE failed %d\n", ret);
+
+    ret = sgx_mm_modify_permissions(addr, PAGE_SIZE, SGX_EMA_PROT_READ);
+    if (ret != 0)
+        oe_host_printf("sgx_mm_modify_permissions to READ failed %d\n", ret);
 
     //data[0] = 20;
     }
 }
 
+static int _handler(const sgx_pfinfo* pfinfo, void* data)
+{
+    int ret;
+
+    (void)data;
+
+    oe_host_printf("page fault addr=0x%lx\n", pfinfo->maddr);
+
+    ret = sgx_mm_commit((void*)pfinfo->maddr, PAGE_SIZE);
+    if (ret != 0)
+        oe_host_printf("sgx_mm_commit failed ret=%d\n", ret);
+
+    return SGX_MM_EXCEPTION_CONTINUE_EXECUTION;
+}
+
+oe_result_t test_emm_alloc_reserve(int custom_handler)
+{
+    oe_result_t result = OE_UNEXPECTED;
+    int ret;
+    void* addr = NULL;
+
+    if (custom_handler)
+    {
+        ret = sgx_mm_alloc(NULL, PAGE_SIZE, SGX_EMA_COMMIT_ON_DEMAND, _handler, NULL, &addr);
+        oe_host_printf("sgx_mm_alloc with customized handler\n");
+    }
+    else
+    {
+        ret = sgx_mm_alloc(NULL, PAGE_SIZE, SGX_EMA_COMMIT_ON_DEMAND, NULL, NULL, &addr);
+        oe_host_printf("sgx_mm_alloc with default handler\n");
+    }
+
+    if (ret != 0)
+    {
+        oe_host_printf("sgx_mm_alloc SGX_EMA_COMMIT_ON_DEMAND failed, r=%d\n", ret);
+        goto done;
+    }
+
+    oe_host_printf("test accessing to on-demand page addr=0x%p\n", addr);
+
+    uint8_t* data = (uint8_t*)addr;
+    data[0] = 10;
+
+    oe_host_printf("test accessing to on-demand page succeeded, data=%u\n", data[0]);
+
+    result = OE_OK;
+
+done:
+    return result;
+}
+
 int enc_emm()
 {
-    oe_host_printf("Hello from Echo function!\n");
+    oe_emm_init();
 
-    sgx_mm_init();
+    //sgx_mm_init();
 
-    dump_layout_entries();
+    //dump_layout_entries();
 
     test_emm();
+
+    test_emm_alloc_reserve(0);
+
+    test_emm_alloc_reserve(1);
 
     return 0;
 }

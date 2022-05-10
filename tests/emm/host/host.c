@@ -13,6 +13,7 @@
 #include "../../../host/sgx/sgx_enclave_common_wrapper.h"
 #include "emm_u.h"
 
+#if 0
 int oe_sgx_mm_alloc_ocall(uint64_t addr, size_t length, int flags)
 {
     int ret = oe_sgx_enclave_alloc(addr, length, flags);
@@ -30,6 +31,7 @@ int oe_sgx_mm_modify_ocall(uint64_t addr, size_t length, int flags_from, int fla
 
     return ret;
 }
+#endif
 
 int main(int argc, const char* argv[])
 {

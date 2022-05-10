@@ -7,6 +7,7 @@
 #include <openenclave/internal/crypto/init.h>
 #include <openenclave/internal/libc/init.h>
 #include <openenclave/internal/malloc.h>
+#include "core/sgx/emm_private.h"
 #include "core_t.h"
 
 /* Forward declarartion for the symcrypt engine initializer */
@@ -37,6 +38,7 @@ const void* oe_link_enclave(void)
         oe_crypto_initialize,
         oe_libc_initialize,
         SCOSSL_ENGINE_Initialize,
+        mm_init_ema,
 #if defined(OE_USE_DEBUG_MALLOC)
         oe_debug_malloc_check,
 #endif /* defined(OE_USE_DEBUG_MALLOC) */

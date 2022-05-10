@@ -133,7 +133,8 @@ static int oe_vdso_user_handler(
 
             /* AEP is assigned by vDSO implementation */
 
-            OE_TRACE_INFO("vDSO: exception occurred");
+            OE_TRACE_INFO("vDSO: exception occurred vector=%u, code=%u, addr=0x%lx\n",
+                          run->exception_vector, run->exception_error_code, run->exception_addr);
 
             oe_host_handle_exception(&host_context);
 

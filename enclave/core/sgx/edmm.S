@@ -4,9 +4,15 @@
 #include "asmdefs.h"
 #include "asmcommon.inc"
 
-.globl oe_eaccept
-.type oe_eaccept, @function
-oe_eaccept:
+//==============================================================================
+// This file implements the necessary wrappers of Intel SGX primitives required
+// by the Enclave Memory Manager (emm) library that supports the Enclave Dynamic
+// Memory Management (EDMM) feature on SGX2 CPUs.
+//==============================================================================
+
+.globl do_eaccept
+.type do_eaccept, @function
+do_eaccept:
 .cfi_startproc
 
     push %rbx
@@ -24,9 +30,9 @@ oe_eaccept:
     ret
 .cfi_endproc
 
-.globl oe_eacceptcopy
-.type oe_eacceptcopy, @function
-oe_eacceptcopy:
+.globl do_eacceptcopy
+.type do_eacceptcopy, @function
+do_eacceptcopy:
 .cfi_startproc
     push %rbx
     push %rcx
@@ -43,9 +49,9 @@ oe_eacceptcopy:
     ret
 .cfi_endproc
 
-.globl oe_emodpe
-.type oe_emodpe, @function
-oe_emodpe:
+.globl do_emodpe
+.type do_emodpe, @function
+do_emodpe:
 .cfi_startproc
     push %rbx
     push %rcx

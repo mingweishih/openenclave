@@ -14,10 +14,4 @@ enclave {
     trusted {
         public int enc_emm();
     };
-
-    untrusted {
-        int oe_sgx_mm_alloc_ocall(uint64_t addr, size_t length, int flags);
-
-        int oe_sgx_mm_modify_ocall(uint64_t addr, size_t length, int flags_from, int flags_to);
-    };
 };

@@ -444,47 +444,6 @@ done:
     return result;
 }
 
-static oe_result_t _add_mman_pages(
-    oe_sgx_load_context_t* context,
-    oe_enclave_t* enclave,
-    uint64_t* vaddr)
-{
-    oe_result_t result = OE_FAILURE;
-    oe_page_t* page = NULL;
-
-    page = oe_memalign(OE_PAGE_SIZE, sizeof(oe_page_t));
-    if (!page)
-        OE_RAISE(OE_OUT_OF_MEMORY);
-
-    if (!context || !vaddr || !enclave)
-        OE_RAISE(OE_INVALID_PARAMETER);
-
-    if (enclave->layout_entries_size % OE_PAGE_SIZE)
-        OE_RAISE(OE_INVALID_PARAMETER);
-
-    size_t page_number;
-    size_t src = (uint64_t)page;
-
-    page_number = OE_MMAN_PAGE_NUMBER;
-
-    for (size_t i = 0; i < page_number; i++)
-    {
-        uint64_t addr = enclave->start_address + *vaddr;
-        uint64_t flags = SGX_SECINFO_REG | SGX_SECINFO_W | SGX_SECINFO_R;
-        bool extend = true;
-
-        OE_CHECK(oe_sgx_load_enclave_data(
-            context, enclave->base_address, addr, src, flags, extend));
-
-        (*vaddr) += OE_PAGE_SIZE;
-    }
-
-    result = OE_OK;
-
-done:
-    return result;
-}
-
 static oe_result_t _calculate_enclave_size(
     size_t image_size,
     size_t tls_page_count,
@@ -630,8 +589,6 @@ static oe_result_t _add_data_pages(
         OE_CHECK(
             _add_control_pages(context, entry, tls_page_count, vaddr, enclave));
     }
-
-    OE_CHECK(_add_mman_pages(context, enclave, vaddr));
 
     OE_CHECK(_add_layout_entries_pages(context, enclave, vaddr));
 
