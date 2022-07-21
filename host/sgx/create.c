@@ -66,7 +66,7 @@ static char* get_fullpath(const char* path)
 #include "vdso.h"
 #include "xstate.h"
 
-#define OE_MMAN_PAGE_NUMBER 10
+#define OE_MMAN_PAGE_NUMBER 40
 
 static volatile oe_load_extra_enclave_data_hook_t
     _oe_load_extra_enclave_data_hook;

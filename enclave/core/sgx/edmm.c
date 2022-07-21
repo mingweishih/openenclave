@@ -1,18 +1,18 @@
 // Copyright (c) Open Enclave SDK contributors.
 // Licensed under the MIT License.
 
+#include <openenclave/corelibc/pthread.h>
 #include <openenclave/corelibc/stdlib.h>
 #include <openenclave/corelibc/string.h>
-#include <openenclave/corelibc/pthread.h>
 #include <openenclave/enclave.h>
 #include <openenclave/internal/globals.h>
 #include <openenclave/internal/trace.h>
 
 #define _sgx_mm_mutex _oe_pthread_mutex
 
-#include "sgx_mm_rt_abstraction.h"
 #include "emm_private.h"
 #include "platform_t.h"
+#include "sgx_mm_rt_abstraction.h"
 
 typedef struct _oe_sgx_enclave_layout
 {
@@ -24,16 +24,14 @@ typedef struct _oe_sgx_enclave_layout
 
 static sgx_mm_pfhandler_t _emm_handler_wrapper;
 
-void sgx_mm_init();
-
 bool sgx_mm_is_within_enclave(const void* addr, size_t size)
 {
     return oe_is_within_enclave(addr, size);
 }
 
-sgx_mm_mutex *sgx_mm_mutex_create(void)
+sgx_mm_mutex* sgx_mm_mutex_create(void)
 {
-    sgx_mm_mutex *m = (sgx_mm_mutex*)oe_malloc(sizeof(sgx_mm_mutex));
+    sgx_mm_mutex* m = (sgx_mm_mutex*)oe_malloc(sizeof(sgx_mm_mutex));
 
     if (!m)
     {
@@ -46,17 +44,17 @@ sgx_mm_mutex *sgx_mm_mutex_create(void)
     return m;
 }
 
-int sgx_mm_mutex_lock(sgx_mm_mutex *mutex)
+int sgx_mm_mutex_lock(sgx_mm_mutex* mutex)
 {
     return oe_pthread_mutex_lock(mutex);
 }
 
-int sgx_mm_mutex_unlock(sgx_mm_mutex *mutex)
+int sgx_mm_mutex_unlock(sgx_mm_mutex* mutex)
 {
     return oe_pthread_mutex_unlock(mutex);
 }
 
-int sgx_mm_mutex_destroy(sgx_mm_mutex *mutex)
+int sgx_mm_mutex_destroy(sgx_mm_mutex* mutex)
 {
     int ret = oe_pthread_mutex_destroy(mutex);
 
@@ -78,11 +76,16 @@ int sgx_mm_alloc_ocall(uint64_t addr, size_t length, int flags)
     return ret;
 }
 
-int sgx_mm_modify_ocall(uint64_t addr, size_t length, int flags_from, int flags_to)
+int sgx_mm_modify_ocall(
+    uint64_t addr,
+    size_t length,
+    int flags_from,
+    int flags_to)
 {
     int ret;
 
-    if (oe_sgx_mm_modify_ocall(&ret, addr, length, flags_from, flags_to) != OE_OK)
+    if (oe_sgx_mm_modify_ocall(&ret, addr, length, flags_from, flags_to) !=
+        OE_OK)
     {
         OE_TRACE_ERROR("oe_sgx_mm_modify_ocall failed\n");
         oe_abort();
@@ -122,7 +125,9 @@ bool sgx_mm_unregister_pfhandler(sgx_mm_pfhandler_t pfhandler)
     return true;
 }
 
-static void oe_register_emm_layout()
+/* No longer needed */
+#if 0
+void _oe_register_emm_layout()
 {
     size_t entries_count = __oe_get_layout_entries_size() / sizeof(oe_sgx_enclave_layout_t);
 
@@ -152,9 +157,24 @@ static void oe_register_emm_layout()
         }
     }
 }
+#endif
+
+static void _oe_sgx_emm_init()
+{
+    uint64_t user_end =
+        (uint64_t)__oe_get_enclave_base_address() + __oe_get_enclave_size();
+    uint64_t user_start = user_end - OE_PAGE_SIZE * 40;
+
+    OE_TRACE_INFO(
+        "emm range 0x%lx - 0x%lx (size: %zu)",
+        user_start,
+        user_end,
+        user_end - user_start);
+    sgx_mm_init(user_start, user_end);
+}
 
 void oe_emm_init()
 {
-    sgx_mm_init();
-    oe_register_emm_layout();
+    OE_TRACE_ERROR("emm init...");
+    _oe_sgx_emm_init();
 }

@@ -2,27 +2,26 @@
 // Licensed under the MIT License.
 
 #include <openenclave/corelibc/string.h>
-#include <openenclave/corelibc/pthread.h>
 #include <openenclave/enclave.h>
 #include <openenclave/internal/globals.h>
 #include <openenclave/internal/print.h>
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "emm_t.h"
 
 #define _sgx_mm_mutex _oe_pthread_mutex
 
+#include "emm_private.h"
 #include "sgx_mm.h"
 #include "sgx_mm_primitives.h"
 #include "sgx_mm_rt_abstraction.h"
-#include "emm_private.h"
 
 #define PAGE_SIZE 4096
 
 void oe_emm_init();
 
-#if 0
 typedef struct _oe_sgx_enclave_layout
 {
     uint64_t address;
@@ -33,58 +32,34 @@ typedef struct _oe_sgx_enclave_layout
 
 void sgx_mm_init();
 
-typedef int (*sgx_mm_pfhandler_t)(const sgx_pfinfo *pfinfo);
-static sgx_mm_pfhandler_t _global_handler;
-
-static uint64_t _oe_handler(oe_exception_record_t* record)
-{
-    sgx_pfinfo info = {0};
-
-    if (record->code == OE_EXCEPTION_PAGE_FAULT)
-    {
-        info.maddr = record->faulting_address;
-        memcpy(&info.pfec, &record->error_code, sizeof(uint32_t));
-        //oe_host_printf("_oe_handler is triggered by #PF, addr=0x%lx\n", info.maddr);
-        _global_handler(&info);
-    }
-
-    return OE_EXCEPTION_CONTINUE_EXECUTION;
-}
-
-bool sgx_mm_register_pfhandler(sgx_mm_pfhandler_t pfhandler)
-{
-    oe_host_printf("sgx_mm_register_pfhandler\n");
-    _global_handler = pfhandler;
-    oe_add_vectored_exception_handler(false, _oe_handler);
-    return true;
-}
-
-bool sgx_mm_unregister_pfhandler(sgx_mm_pfhandler_t pfhandler)
-{
-    (void)(pfhandler);
-    return true;
-}
-
 void dump_layout_entries()
 {
-    size_t entries_count = __oe_get_layout_entries_size() / sizeof(oe_sgx_enclave_layout_t);
+    size_t entries_count =
+        __oe_get_layout_entries_size() / sizeof(oe_sgx_enclave_layout_t);
 
-    oe_sgx_enclave_layout_t* layout_entries = (oe_sgx_enclave_layout_t*)__oe_get_layout_entries_base();
+    oe_sgx_enclave_layout_t* layout_entries =
+        (oe_sgx_enclave_layout_t*)__oe_get_layout_entries_base();
 
-    oe_host_printf("[enclave range] 0x%lx - 0x%lx\n",
-                   (uint64_t)__oe_get_enclave_base_address(),
-                   (uint64_t)__oe_get_enclave_base_address() + __oe_get_enclave_size());
+    oe_host_printf(
+        "[enclave range] 0x%lx - 0x%lx\n",
+        (uint64_t)__oe_get_enclave_base_address(),
+        (uint64_t)__oe_get_enclave_base_address() + __oe_get_enclave_size());
 
     for (size_t i = 0; i < entries_count; i++)
     {
         if (!layout_entries[i].address)
             break;
 
-#ifdef DEBUG
-        oe_host_printf("[dump layout entry] #%zu addr=0x%lx, size=%zu, type: %zu, permission: %zu\n",
-                       i, layout_entries[i].address, layout_entries[i].size, layout_entries[i].type, layout_entries[i].permission);
-#endif
+        oe_host_printf(
+            "[dump layout entry] #%zu addr=0x%lx, size=%zu, type: %zu, "
+            "permission: %zu\n",
+            i,
+            layout_entries[i].address,
+            layout_entries[i].size,
+            layout_entries[i].type,
+            layout_entries[i].permission);
 
+#if 0
         int ret = mm_init_ema((void*)layout_entries[i].address,
                         PAGE_SIZE,
                         (int)layout_entries[i].type,
@@ -95,9 +70,9 @@ void dump_layout_entries()
         {
             oe_host_printf("mm_init_ema failed: ret=%d, addr=0x%lx\n", ret, layout_entries[i].address);
         }
+#endif
     }
 }
-#endif
 
 void test_emm()
 {
@@ -118,8 +93,6 @@ void test_emm()
 
     oe_host_printf("test sgx_mm_alloc\n");
 
-    //while(1)
-    {
     ret = sgx_mm_alloc(NULL, PAGE_SIZE, SGX_EMA_COMMIT_NOW, NULL, NULL, &addr);
 
     oe_host_printf("test sgx_mm_alloc returned=%d\n", ret);
@@ -143,16 +116,77 @@ void test_emm()
 
     oe_host_printf("data[0] = %u\n", data[0]);
 
+    printf("Change page permission to none...");
     ret = sgx_mm_modify_permissions(addr, PAGE_SIZE, SGX_EMA_PROT_NONE);
     if (ret != 0)
-        oe_host_printf("sgx_mm_modify_permissions to NONE failed %d\n", ret);
+        printf("failed\n");
+    else
+        printf("passed\n");
 
+    printf("Change page permission from none to r...");
     ret = sgx_mm_modify_permissions(addr, PAGE_SIZE, SGX_EMA_PROT_READ);
     if (ret != 0)
-        oe_host_printf("sgx_mm_modify_permissions to READ failed %d\n", ret);
+        printf("failed\n");
+    else
+        printf("passed\n");
 
-    //data[0] = 20;
-    }
+    printf("Change page permission from r to w...");
+    ret = sgx_mm_modify_permissions(addr, PAGE_SIZE, SGX_EMA_PROT_WRITE);
+    if (ret != 0)
+        printf("failed\n");
+    else
+        printf("passed\n");
+
+    printf("Change page permission to none...");
+    ret = sgx_mm_modify_permissions(addr, PAGE_SIZE, SGX_EMA_PROT_NONE);
+    if (ret != 0)
+        printf("failed\n");
+    else
+        printf("passed\n");
+
+    printf("Change page permission from none to w...");
+    ret = sgx_mm_modify_permissions(addr, PAGE_SIZE, SGX_EMA_PROT_WRITE);
+    if (ret != 0)
+        printf("failed\n");
+    else
+        printf("passed\n");
+
+    printf("Change page permission to none...");
+    ret = sgx_mm_modify_permissions(addr, PAGE_SIZE, SGX_EMA_PROT_NONE);
+    if (ret != 0)
+        printf("failed\n");
+    else
+        printf("passed\n");
+
+    printf("Change page permission from none to rw...");
+    ret = sgx_mm_modify_permissions(
+        addr, PAGE_SIZE, SGX_EMA_PROT_WRITE | SGX_EMA_PROT_READ);
+    if (ret != 0)
+        printf("failed\n");
+    else
+        printf("passed\n");
+
+    printf("Change page permission from rw to r...");
+    ret = sgx_mm_modify_permissions(addr, PAGE_SIZE, SGX_EMA_PROT_READ);
+    if (ret != 0)
+        printf("failed\n");
+    else
+        printf("passed\n");
+
+    printf("Change page permission to none...");
+    ret = sgx_mm_modify_permissions(addr, PAGE_SIZE, SGX_EMA_PROT_NONE);
+    if (ret != 0)
+        printf("failed\n");
+    else
+        printf("passed\n");
+
+    printf("Change page permission from none to rwx...");
+    ret = sgx_mm_modify_permissions(
+        addr, PAGE_SIZE, SGX_EMA_PROT_WRITE | SGX_EMA_PROT_READ | SGX_EMA_PROT_EXEC);
+    if (ret != 0)
+        printf("failed\n");
+    else
+        printf("passed\n");
 }
 
 static int _handler(const sgx_pfinfo* pfinfo, void* data)
@@ -210,9 +244,7 @@ int enc_emm()
 {
     oe_emm_init();
 
-    //sgx_mm_init();
-
-    //dump_layout_entries();
+    dump_layout_entries();
 
     test_emm();
 
