@@ -31,6 +31,7 @@
 #include "../enclave.h"
 #include "../quote.h"
 #include "../sgxquoteprovider.h"
+#include "../sgx_enclave_common_wrapper.h"
 #include "ocalls.h"
 #include "platform_u.h"
 
@@ -424,4 +425,14 @@ oe_result_t oe_sgx_get_additional_host_entropy_ocall(uint8_t* data, size_t size)
 
 done:
     return result;
+}
+
+int oe_sgx_mm_alloc_ocall(uint64_t addr, size_t length, int flags)
+{
+    return oe_sgx_enclave_alloc(addr, length, flags);
+}
+
+int oe_sgx_mm_modify_ocall(uint64_t addr, size_t length, int flags_from, int flags_to)
+{
+    return oe_sgx_enclave_modify(addr, length, flags_from, flags_to);
 }

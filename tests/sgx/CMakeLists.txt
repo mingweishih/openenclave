@@ -2,6 +2,7 @@
 # Licensed under the MIT License.
 
 if (UNIX)
+  add_subdirectory(emm)
   add_subdirectory(td_state)
   add_subdirectory(thread_interrupt)
 endif ()

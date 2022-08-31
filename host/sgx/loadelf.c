@@ -32,6 +32,7 @@
 #include "../memalign.h"
 #include "../strings.h"
 #include "enclave.h"
+#include "layout.h"
 #include "sgxload.h"
 
 static void _unload_elf_image(oe_enclave_elf_image_t* image)
@@ -625,6 +626,8 @@ static oe_result_t _add_relocation_pages(
             OE_CHECK(oe_safe_add_u64(enclave->start_address, *vaddr, &addr));
             OE_CHECK(oe_sgx_load_enclave_data(
                 context, enclave->base_address, addr, src, flags, extend));
+            OE_CHECK(oe_sgx_add_enclave_layout_entry(
+                enclave, addr, OE_PAGE_SIZE, flags));
             (*vaddr) += sizeof(oe_page_t);
         }
     }
@@ -647,6 +650,11 @@ static oe_result_t _add_segment_pages(
     assert(image);
     assert(vaddr);
 
+    uint64_t base_address = 0;
+    uint64_t previous_segment_end = 0;
+
+    OE_CHECK(oe_safe_add_u64(enclave->start_address, *vaddr, &base_address));
+
     for (size_t i = 0; i < image->num_segments; i++)
     {
         oe_elf_segment_t* segment = &image->segments[i];
@@ -657,6 +665,29 @@ static oe_result_t _add_segment_pages(
         OE_CHECK(oe_safe_add_u64(
             segment->vaddr, (uint64_t)segment->memsz, &segment_end));
         uint64_t flags = _make_secinfo_flags(segment->flags);
+
+        if (!previous_segment_end)
+            previous_segment_end = oe_round_up_to_page_size(segment_end);
+        else
+        {
+            uint64_t gap = page_rva - previous_segment_end;
+            if (page_rva > previous_segment_end && gap > 0)
+            {
+                size_t gap_pages = (size_t)gap / OE_PAGE_SIZE;
+                for (size_t i = 0; i < gap_pages; i++)
+                {
+                    uint64_t addr;
+                    OE_CHECK(oe_safe_add_u64(
+                        base_address, previous_segment_end, &addr));
+                    OE_CHECK(oe_sgx_add_enclave_layout_entry(
+                        enclave,
+                        addr,
+                        OE_PAGE_SIZE,
+                        OE_SGX_EMA_PAGE_TYPE_RESERVE));
+                }
+            }
+            previous_segment_end = oe_round_up_to_page_size(segment_end);
+        }
 
         if (flags == 0)
         {
@@ -672,10 +703,11 @@ static oe_result_t _add_segment_pages(
             uint64_t addr = 0;
             OE_CHECK(
                 oe_safe_add_u64((uint64_t)image->image_base, page_rva, &src));
-            OE_CHECK(oe_safe_add_u64(enclave->start_address, *vaddr, &addr));
-            OE_CHECK(oe_safe_add_u64(addr, page_rva, &addr));
+            OE_CHECK(oe_safe_add_u64(base_address, page_rva, &addr));
             OE_CHECK(oe_sgx_load_enclave_data(
                 context, enclave->base_address, addr, src, flags, true));
+            OE_CHECK(oe_sgx_add_enclave_layout_entry(
+                enclave, addr, OE_PAGE_SIZE, flags));
         }
     }
 
@@ -949,6 +981,8 @@ static oe_result_t _patch_elf_image(
     oe_enclave_elf_image_t* image,
     oe_enclave_elf_image_t* module_image,
     size_t enclave_size,
+    size_t layout_entreis_offest,
+    size_t layout_entreis_size,
     size_t tls_page_count,
     size_t extra_data_size)
 {
@@ -957,6 +991,7 @@ static oe_result_t _patch_elf_image(
     oe_enclave_module_info_t* module_info;
     uint64_t enclave_rva = 0;
     uint64_t oeprops_address = 0;
+
     OE_CHECK(oe_safe_add_u64(
         (uint64_t)image->image_base, image->oeinfo_rva, &oeprops_address));
     oeprops = (oe_sgx_enclave_properties_t*)oeprops_address;
@@ -966,6 +1001,7 @@ static oe_result_t _patch_elf_image(
     if (module_image)
         assert((module_image->image_size & (OE_PAGE_SIZE - 1)) == 0);
     assert((enclave_size & (OE_PAGE_SIZE - 1)) == 0);
+    assert(layout_entreis_offest + layout_entreis_size <= enclave_size);
 
     oeprops->image_info.enclave_size = enclave_size;
     oeprops->image_info.oeinfo_rva = image->oeinfo_rva;
@@ -983,6 +1019,7 @@ static oe_result_t _patch_elf_image(
             oeprops->image_info.reloc_rva,
             module_image->image_size,
             &oeprops->image_info.reloc_rva));
+
     /* Note that the image->reloc_size now holds the merged (base + module),
      * zero-padded relocation data. */
     oeprops->image_info.reloc_size = image->reloc_size;
@@ -994,8 +1031,11 @@ static oe_result_t _patch_elf_image(
     /* heap is right after the padded relocs */
     OE_CHECK(oe_safe_add_u64(
         oeprops->image_info.reloc_rva,
-        image->reloc_size,
+        oeprops->image_info.reloc_size,
         &oeprops->image_info.heap_rva));
+
+    oeprops->image_info.layout_entries_rva = layout_entreis_offest;
+    oeprops->image_info.layout_entries_size = layout_entreis_size;
 
     /* move heap past extra data */
     oeprops->image_info.heap_rva += extra_data_size;
@@ -1200,7 +1240,9 @@ done:
 static oe_result_t _patch(
     oe_enclave_image_t* image,
     size_t enclave_size,
-    size_t extra_data_size)
+    size_t extra_data_size,
+    size_t layout_entreis_offest,
+    size_t layout_entreis_size)
 {
     oe_result_t result = OE_UNEXPECTED;
     size_t tls_page_count;
@@ -1210,6 +1252,8 @@ static oe_result_t _patch(
         &image->elf,
         image->submodule,
         enclave_size,
+        layout_entreis_offest,
+        layout_entreis_size,
         tls_page_count,
         extra_data_size));
 

@@ -252,6 +252,32 @@ const void* __oe_get_heap_end()
 /*
 **==============================================================================
 **
+** Layout entries boundaries:
+**
+**==============================================================================
+*/
+
+const void* __oe_get_layout_entries_base()
+{
+    const unsigned char* start = __oe_get_enclave_start_address();
+
+    return start + oe_enclave_properties_sgx.image_info.layout_entries_rva;
+}
+
+const void* __oe_get_layout_entries_end()
+{
+    return (const uint8_t*)__oe_get_layout_entries_base() +
+           __oe_get_layout_entries_size();
+}
+
+size_t __oe_get_layout_entries_size()
+{
+    return oe_enclave_properties_sgx.image_info.layout_entries_size;
+}
+
+/*
+**==============================================================================
+**
 ** oe_enclave:
 **
 **     The enclave handle obtained with oe_create_enclave() and passed

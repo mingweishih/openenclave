@@ -1,0 +1,13 @@
+// Copyright (c) Open Enclave SDK contributors.
+// Licensed under the MIT License.
+
+enclave {
+    from "openenclave/edl/logging.edl" import *;
+    from "openenclave/edl/fcntl.edl" import *;
+    from "openenclave/edl/sgx/platform.edl" import *;
+    from "openenclave/edl/sgx/thread.edl" import *;
+
+    trusted {
+        public int enc_emm();
+    };
+};
