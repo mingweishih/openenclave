@@ -532,9 +532,10 @@ static oe_result_t _verify_evidence(
     {
         tdx_quote_t* quote = (tdx_quote_t*)evidence_buffer;
 
-        // TDX quote should have version 4
+        // TDX quote should have either version 4 or 5
         if (evidence_buffer_size < sizeof(*quote) + quote->signature_len ||
-            quote->version != SGX_QE4_QUOTE_VERSION ||
+            (quote->version != SGX_QE4_QUOTE_VERSION &&
+             quote->version != SGX_QE5_QUOTE_VERSION) ||
             quote->sign_type != SGX_QL_ALG_ECDSA_P256 ||
             quote->tee_type != TDX_QUOTE_TYPE)
             OE_RAISE(OE_INVALID_PARAMETER);
