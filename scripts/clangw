@@ -54,6 +54,12 @@ function call_clang {
         if [[ "$a" =~ /[wW][dD][0-9]* ]]; then
             continue
         fi
+        # Ignore /weXXXX (treat-warning-as-error) flags when invoking plain clang.
+        # These are MSVC-style promote-to-error options which plain clang (non clang-cl)
+        # interprets as file paths. We already enforce errors via other mechanisms on MSVC builds.
+        if [[ "$a" =~ /[wW][eE][0-9]+ ]]; then
+            continue
+        fi
 
         # Map the following arguments
         [ "$a" == "/DNDEBUG" ]   && args+="-DNDEBUG "   && continue
