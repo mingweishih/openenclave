@@ -1610,6 +1610,24 @@ enclave_compile_definitions(opensslssl_3 PRIVATE ${OPENSSL_3_COMPILE_DEFINES})
 
 # Generate the buildinf.h used by the OpenSSL_version API.
 get_target_property(OPENSSL_C_OPTIONS opensslcrypto COMPILE_OPTIONS)
+# The target's COMPILE_OPTIONS may contain generator expressions such as
+# $<COMPILE_LANGUAGE:C> that are only valid in specific CMake contexts
+# (include dirs / compile defs / compile options / file(GENERATE)). We pass
+# the flattened flags list to an add_custom_command (mkbuildinf.pl invocation),
+# which causes CMake to error out when it encounters those expressions.
+# Strip any entries containing $<COMPILE_LANGUAGE:...> before constructing
+# the OPENSSL_CFLAGS string used to generate buildinf.h.
+if(OPENSSL_C_OPTIONS)
+  set(_SANITIZED_OPENSSL_C_OPTIONS "")
+  foreach(opt IN LISTS OPENSSL_C_OPTIONS)
+    if(opt MATCHES "\\$<COMPILE_LANGUAGE:")
+      # Skip generator-expression guarded option; not needed for buildinf.h
+    else()
+      list(APPEND _SANITIZED_OPENSSL_C_OPTIONS "${opt}")
+    endif()
+  endforeach()
+  set(OPENSSL_C_OPTIONS ${_SANITIZED_OPENSSL_C_OPTIONS})
+endif()
 set(OPENSSL_C_DEFINES ${OPENSSL_BUILD_INFO})
 list(TRANSFORM OPENSSL_C_DEFINES PREPEND "-D")
 list(APPEND OPENSSL_CFLAGS ${OPENSSL_C_COMPILER} ${OPENSSL_C_OPTIONS}

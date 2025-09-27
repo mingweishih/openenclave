@@ -146,9 +146,46 @@ elseif (MSVC)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4566 /wd4200")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4566 /wd4200")
 
-  # Add Flags we want to use for both C and CXX
-  add_compile_options(/WX)
-  add_compile_options(/W3)
+  # Warning configuration (customizable for triage)
+  option(OE_DISABLE_WX "Disable treating warnings as errors (for warning triage builds)" OFF)
+  set(OE_WARNING_LEVEL "3" CACHE STRING "MSVC warning level (3 or 4) for Open Enclave build")
+  set_property(CACHE OE_WARNING_LEVEL PROPERTY STRINGS 3 4)
+
+  if (NOT OE_DISABLE_WX)
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:/WX> $<$<COMPILE_LANGUAGE:CXX>:/WX>)
+  else ()
+    message(STATUS "OE_DISABLE_WX=ON: /WX suppressed for warning triage")
+  endif ()
+
+  if (OE_WARNING_LEVEL STREQUAL "4")
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:/W4> $<$<COMPILE_LANGUAGE:CXX>:/W4>)
+    message(STATUS "Using /W4 warning level")
+  else ()
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:/W3> $<$<COMPILE_LANGUAGE:CXX>:/W3>)
+  endif ()
+
+  # Promote mandatory security-related warnings explicitly (in case /WX disabled)
+  # These map to the SDL required set.
+  add_compile_options($<$<COMPILE_LANGUAGE:C>:/we4018> $<$<COMPILE_LANGUAGE:CXX>:/we4018>
+                      $<$<COMPILE_LANGUAGE:C>:/we4055> $<$<COMPILE_LANGUAGE:CXX>:/we4055>
+                      $<$<COMPILE_LANGUAGE:C>:/we4146> $<$<COMPILE_LANGUAGE:CXX>:/we4146>
+                      $<$<COMPILE_LANGUAGE:C>:/we4242> $<$<COMPILE_LANGUAGE:CXX>:/we4242>
+                      $<$<COMPILE_LANGUAGE:C>:/we4244> $<$<COMPILE_LANGUAGE:CXX>:/we4244>
+                      $<$<COMPILE_LANGUAGE:C>:/we4267> $<$<COMPILE_LANGUAGE:CXX>:/we4267>
+                      $<$<COMPILE_LANGUAGE:C>:/we4302> $<$<COMPILE_LANGUAGE:CXX>:/we4302>
+                      $<$<COMPILE_LANGUAGE:C>:/we4308> $<$<COMPILE_LANGUAGE:CXX>:/we4308>
+                      $<$<COMPILE_LANGUAGE:C>:/we4509> $<$<COMPILE_LANGUAGE:CXX>:/we4509>
+                      $<$<COMPILE_LANGUAGE:C>:/we4510> $<$<COMPILE_LANGUAGE:CXX>:/we4510>
+                      $<$<COMPILE_LANGUAGE:C>:/we4532> $<$<COMPILE_LANGUAGE:CXX>:/we4532>
+                      $<$<COMPILE_LANGUAGE:C>:/we4533> $<$<COMPILE_LANGUAGE:CXX>:/we4533>
+                      $<$<COMPILE_LANGUAGE:C>:/we4610> $<$<COMPILE_LANGUAGE:CXX>:/we4610>
+                      $<$<COMPILE_LANGUAGE:C>:/we4611> $<$<COMPILE_LANGUAGE:CXX>:/we4611>
+                      $<$<COMPILE_LANGUAGE:C>:/we4700> $<$<COMPILE_LANGUAGE:CXX>:/we4700>
+                      $<$<COMPILE_LANGUAGE:C>:/we4701> $<$<COMPILE_LANGUAGE:CXX>:/we4701>
+                      $<$<COMPILE_LANGUAGE:C>:/we4703> $<$<COMPILE_LANGUAGE:CXX>:/we4703>
+                      $<$<COMPILE_LANGUAGE:C>:/we4789> $<$<COMPILE_LANGUAGE:CXX>:/we4789>
+                      $<$<COMPILE_LANGUAGE:C>:/we4995> $<$<COMPILE_LANGUAGE:CXX>:/we4995>
+                      $<$<COMPILE_LANGUAGE:C>:/we4996> $<$<COMPILE_LANGUAGE:CXX>:/we4996>)
 
   # Ignore compiler warnings:
   # * unicode character not supported

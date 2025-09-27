@@ -12,6 +12,11 @@
 #ifndef _OE_EDGER8R_COMMON_H
 #define _OE_EDGER8R_COMMON_H
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4127)
+#endif
+
 #include <openenclave/bits/defs.h>
 #include <openenclave/bits/result.h>
 #include <openenclave/bits/types.h>

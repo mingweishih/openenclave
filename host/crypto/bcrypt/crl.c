@@ -99,7 +99,7 @@ oe_result_t oe_crl_read_pem(
     oe_result_t result = OE_UNEXPECTED;
     crl_t* impl = (crl_t*)crl;
 
-    char der_data[DER_DATA_SIZE];
+    BYTE der_data[DER_DATA_SIZE];
     size_t der_data_size = DER_DATA_SIZE;
 
     /* Clear the implementation */
@@ -114,19 +114,23 @@ oe_result_t oe_crl_read_pem(
      * Convert from PEM format to DER format - removes header and footer and
      * decodes from base64
      */
-    if (!CryptStringToBinary(
-            pem_data,
-            0,
-            CRYPT_STRING_BASE64HEADER,
-            der_data,
-            &(DWORD)der_data_size,
-            NULL,
-            NULL))
     {
-        OE_RAISE_MSG(
-            OE_CRYPTO_ERROR,
-            "CryptStringToBinary failed, err=%#x\n",
-            GetLastError());
+        DWORD dsize = (DWORD)der_data_size;
+        if (!CryptStringToBinary(
+                (LPCSTR)pem_data,
+                0,
+                CRYPT_STRING_BASE64HEADER,
+                (BYTE*)der_data,
+                &dsize,
+                NULL,
+                NULL))
+        {
+            OE_RAISE_MSG(
+                OE_CRYPTO_ERROR,
+                "CryptStringToBinary failed, err=%#x\n",
+                GetLastError());
+        }
+        der_data_size = (size_t)dsize;
     }
 
     PCCRL_CONTEXT crl_context =

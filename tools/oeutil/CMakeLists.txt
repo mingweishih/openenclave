@@ -13,7 +13,7 @@ if (BUILD_ENCLAVES)
   add_custom_command(
     OUTPUT oeutil_enc_private.pem oeutil_enc_public.pem oeutil_enc_pubkey.h
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_pubkey_header.sh
-    COMMAND openssl genrsa -out oeutil_enc_private.pem -3 3072
+  COMMAND openssl genrsa -out oeutil_enc_private.pem -3 3072
     COMMAND openssl rsa -in oeutil_enc_private.pem -pubout -out
             oeutil_enc_public.pem
     COMMAND ${OE_BASH} -c ${gen_pubkey_header_command}

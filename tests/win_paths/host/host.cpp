@@ -78,7 +78,7 @@ void _combine_paths(
     const wchar_t* path)
 {
     wchar_t combined_path[MAX_PATH] = {0};
-    size_t root_path_length = wcsnlen(root_path, MAX_PATH);
+    /* removed unused root_path_length variable (was: size_t root_path_length = wcsnlen(root_path, MAX_PATH);) */
     if (result_path_size <=
         wcsnlen(root_path, MAX_PATH) + wcsnlen(path, MAX_PATH))
     {

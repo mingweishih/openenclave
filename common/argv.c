@@ -137,7 +137,8 @@ oe_result_t oe_buffer_to_argv(
     }
 
     /* Allocate the argv memory. */
-    if (!(argv = (*malloc_func)(alloc_size)))
+    argv = (*malloc_func)(alloc_size);
+    if (!argv)
         OE_RAISE(OE_OUT_OF_MEMORY);
 
     /* Copy the strings onto the argv memory. */

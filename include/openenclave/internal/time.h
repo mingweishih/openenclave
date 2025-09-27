@@ -47,6 +47,8 @@ uint64_t oe_get_time(void);
 **==============================================================================
 */
 
+struct timeval;
+struct timezone;
 int gettimeofday(struct timeval* tv, struct timezone* tz);
 #endif
 

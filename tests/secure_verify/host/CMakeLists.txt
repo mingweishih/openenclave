@@ -32,6 +32,7 @@ target_link_libraries(secure_verify oehost OpenSSL::SSL)
 # To work around for this internal tool, secure_verify will be compiled at w2 level.
 if (WIN32)
   target_compile_options(secure_verify PRIVATE /W2)
+  target_compile_definitions(secure_verify PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif ()
 
 # Generate the oecert binary in the the same directory with enclave binary

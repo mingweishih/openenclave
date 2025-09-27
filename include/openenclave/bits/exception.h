@@ -133,16 +133,29 @@ OE_EXTERNC_BEGIN
 /**
  * Blob that contains X87 and SSE data.
  */
+/* Suppress padding warning (alignment is intentional for XState save area) */
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4324)
+#endif
 typedef struct _oe_basic_xstate
 {
     uint8_t blob[512]; /**< Holds XState i.e. X87 and SSE data */
 } OE_ALIGNED(16) oe_basic_xstate_t;
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 /**< typedef struct _oe_basic_xstate oe_basic_xstate_t*/
 
 /**
  * Register state to be saved before an exception and
  * restored after the exception has been handled in the enclave.
  */
+/* Suppress padding warning for intentionally aligned context structure */
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4324)
+#endif
 typedef struct _oe_context
 {
     /**
@@ -194,6 +207,9 @@ typedef struct _oe_context
 
     // Don't need to manipulate other XSTATE (AVX etc.).
 } oe_context_t;
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 /**< typedef struct _oe_context oe_context_t*/
 
 /**

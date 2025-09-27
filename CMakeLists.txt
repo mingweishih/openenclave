@@ -225,11 +225,16 @@ if (OE_SGX)
     string(REPLACE " " ";" CONFIG_OUTPUT ${CONFIG_OUTPUT})
     # Get the major version for clang
     list(GET CONFIG_OUTPUT 2 MAJOR_VERSION)
-    if (MAJOR_VERSION VERSION_LESS 10 OR MAJOR_VERSION VERSION_GREATER 11)
+    # Allow newer Clang versions behind an opt-in flag to enable forward testing on Windows.
+    option(OE_ALLOW_UNSUPPORTED_CLANG "Allow building ELF enclaves with newer (unsupported) Clang versions" OFF)
+    if (MAJOR_VERSION VERSION_LESS 10 OR (MAJOR_VERSION VERSION_GREATER 11 AND NOT OE_ALLOW_UNSUPPORTED_CLANG))
       message(
         FATAL_ERROR
-          "Building ELF enclaves with Clang version ${CLANG_C_COMPILER_VERSION} is not supported.
-        Only Clang version 10 and 11 is supported")
+          "Building ELF enclaves with Clang version ${CLANG_C_COMPILER_VERSION} (major ${MAJOR_VERSION}) is not supported.\n"
+          "Only Clang major versions 10 and 11 are officially supported.\n"
+          "Pass -DOE_ALLOW_UNSUPPORTED_CLANG=ON to proceed at your own risk with newer Clang.")
+    elseif (MAJOR_VERSION VERSION_GREATER 11 AND OE_ALLOW_UNSUPPORTED_CLANG)
+      message(WARNING "Proceeding with unsupported Clang major version ${MAJOR_VERSION} (requested via OE_ALLOW_UNSUPPORTED_CLANG).")
     endif ()
 
     set(USE_CLANGW ON)

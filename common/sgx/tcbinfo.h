@@ -14,6 +14,11 @@
 
 OE_EXTERNC_BEGIN
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4201) /* nameless struct/union */
+#endif
+
 #define OE_TCB_LEVEL_STATUS_UNKNOWN (0)
 // Info should be of type oe_parsed_tcb_info_t, field should be one of common
 // fields among oe_parsed_tcb_info_v2_t and oe_parsed_tcb_info_v3_t Valid fields
@@ -295,5 +300,9 @@ oe_result_t oe_parse_advisoryids_json(
     size_t* num_ids);
 
 OE_EXTERNC_END
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif // _OE_COMMON_TCBINFO_H

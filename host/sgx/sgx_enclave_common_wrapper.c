@@ -117,6 +117,10 @@ done:
 
 static void _load_sgx_enclave_common_impl(void)
 {
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4152) /* function/data pointer conversion during dynamic lookup */
+#endif
     oe_result_t result = OE_FAILURE;
     OE_TRACE_INFO("Loading %s\n", LIBRARY_NAME);
     _module = LOAD_SGX_ENCLAVE_COMMON();
@@ -158,6 +162,9 @@ static void _load_sgx_enclave_common_impl(void)
     }
 
 done:
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
     return;
 }
 

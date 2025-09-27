@@ -8,6 +8,7 @@
 #include <openenclave/internal/safecrt.h>
 #include <openenclave/internal/safemath.h>
 #include <openenclave/internal/utils.h>
+#include <openenclave/internal/trace.h>
 #include "bcrypt.h"
 
 typedef struct _pem_header_info
@@ -84,14 +85,36 @@ oe_result_t oe_bcrypt_pem_to_der(
     pem_size--;
 
     /* Size the expected DER output */
+    DWORD string_type = CRYPT_STRING_BASE64HEADER;
+    OE_TRACE_VERBOSE(
+        "PEM input size=%zu first bytes=%02x %02x %02x %02x",
+        pem_size,
+        pem_size > 0 ? pem_data[0] : 0,
+        pem_size > 1 ? pem_data[1] : 0,
+        pem_size > 2 ? pem_data[2] : 0,
+        pem_size > 3 ? pem_data[3] : 0);
+
     success = CryptStringToBinaryA(
         (const char*)pem_data,
         (DWORD)pem_size,
-        CRYPT_STRING_BASE64HEADER,
+        string_type,
         NULL,
         &der_local_size,
         NULL,
         NULL);
+
+    if (!success && GetLastError() == ERROR_INVALID_DATA)
+    {
+        string_type = CRYPT_STRING_ANY;
+        success = CryptStringToBinaryA(
+            (const char*)pem_data,
+            (DWORD)pem_size,
+            string_type,
+            NULL,
+            &der_local_size,
+            NULL,
+            NULL);
+    }
 
     /* Should return true and set der_local_size when given a null buffer */
     if (!success)
@@ -108,17 +131,37 @@ oe_result_t oe_bcrypt_pem_to_der(
     success = CryptStringToBinaryA(
         (const char*)pem_data,
         (DWORD)pem_size,
-        CRYPT_STRING_BASE64HEADER,
+        string_type,
         der_local,
         &der_local_size,
         NULL,
         NULL);
+
+    if (!success && GetLastError() == ERROR_INVALID_DATA)
+    {
+        success = CryptStringToBinaryA(
+            (const char*)pem_data,
+            (DWORD)pem_size,
+            CRYPT_STRING_ANY,
+            der_local,
+            &der_local_size,
+            NULL,
+            NULL);
+    }
 
     if (!success)
         OE_RAISE_MSG(
             OE_CRYPTO_ERROR,
             "CryptStringToBinaryA failed (err=%#x)\n",
             GetLastError());
+
+    OE_TRACE_VERBOSE(
+        "PEM->DER size=%lu first bytes=%02x %02x %02x %02x",
+        (unsigned long)der_local_size,
+        der_local_size > 0 ? der_local[0] : 0,
+        der_local_size > 1 ? der_local[1] : 0,
+        der_local_size > 2 ? der_local[2] : 0,
+        der_local_size > 3 ? der_local[3] : 0);
 
     *der_data_size = der_local_size;
     *der_data = der_local;

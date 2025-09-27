@@ -7,6 +7,11 @@
 
 #include <stdint.h>
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4201) /* nameless struct/union */
+#endif
+
 /*****************************************************************************
  * Data types and interfaces for getting platform revocation info. This
  * includes fetching CRLs as well as the Intel-defined TCB info.
@@ -101,5 +106,9 @@ typedef sgx_plat_error_t (*sgx_ql_set_logging_function_t)(
 /// Set the base URL for the certificate host service. This is typically done
 /// for testing.
 typedef sgx_plat_error_t (*sgx_ql_set_base_url_t)(const char* url);
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif // #ifndef PLATFORM_QUOTE_PROVIDER_H

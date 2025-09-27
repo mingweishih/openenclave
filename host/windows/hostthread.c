@@ -8,6 +8,29 @@
 
 typedef DWORD (*start_routine_t)(void*);
 
+#include <stdlib.h>
+
+struct _oe_thread_start
+{
+    void* (*func)(void*);
+    void* arg;
+};
+
+struct _oe_once_wrapper
+{
+    void (*func)(void);
+};
+
+static DWORD WINAPI _oe_thread_trampoline(void* param)
+{
+    struct _oe_thread_start* ctx = (struct _oe_thread_start*)param;
+    void* (*f)(void*) = ctx->func;
+    void* a = ctx->arg;
+    f(a);
+    free(ctx);
+    return 0;
+}
+
 /*
 **==============================================================================
 **
@@ -18,9 +41,24 @@ typedef DWORD (*start_routine_t)(void*);
 
 int oe_thread_create(oe_thread_t* thread, void* (*func)(void*), void* arg)
 {
-    start_routine_t start_routine = (start_routine_t)func;
-    *thread = (oe_thread_t)CreateThread(NULL, 0, start_routine, arg, 0, NULL);
-    return *thread == (oe_thread_t)NULL ? OE_EINVAL : 0;
+    if (!thread || !func)
+        return OE_EINVAL;
+
+    struct _oe_thread_start* ctx =
+        (struct _oe_thread_start*)malloc(sizeof(struct _oe_thread_start));
+    if (!ctx)
+        return OE_EINVAL;
+    ctx->func = func;
+    ctx->arg = arg;
+
+    HANDLE h = CreateThread(NULL, 0, _oe_thread_trampoline, ctx, 0, NULL);
+    if (!h)
+    {
+        free(ctx);
+        return OE_EINVAL;
+    }
+    *thread = (oe_thread_t)h;
+    return 0;
 }
 
 int oe_thread_join(oe_thread_t thread)
@@ -59,14 +97,28 @@ static BOOL CALLBACK OnceHelper(
 {
     OE_UNUSED(InitOnce);
     OE_UNUSED(Context);
-
-    ((void (*)(void))Parameter)();
+    struct _oe_once_wrapper* wrapper = (struct _oe_once_wrapper*)Parameter;
+    void (*f)(void) = wrapper->func;
+    f();
+    free(wrapper);
     return TRUE;
 }
 
 int oe_once(oe_once_type* once, void (*func)(void))
 {
-    return InitOnceExecuteOnce(once, OnceHelper, func, NULL);
+    if (!once || !func)
+        return OE_EINVAL;
+    struct _oe_once_wrapper* wrapper =
+        (struct _oe_once_wrapper*)malloc(sizeof(struct _oe_once_wrapper));
+    if (!wrapper)
+        return OE_EINVAL;
+    wrapper->func = func;
+    if (!InitOnceExecuteOnce(once, OnceHelper, wrapper, NULL))
+    {
+        free(wrapper);
+        return OE_EINVAL;
+    }
+    return 0;
 }
 
 /*

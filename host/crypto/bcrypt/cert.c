@@ -19,6 +19,11 @@
 #include "rsa.h"
 #include "util.h"
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4706) /* assignment within conditional expression */
+#endif
+
 /*
 **==============================================================================
 **
@@ -1342,3 +1347,7 @@ done:
 
     return result;
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif

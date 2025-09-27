@@ -7,6 +7,7 @@
 #include <openenclave/internal/sgxcreate.h>
 #include <openenclave/internal/sgxsign.h>
 #include <openenclave/internal/str.h>
+#include <openenclave/internal/trace.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include "../host/sgx/enclave.h"
@@ -445,10 +446,11 @@ static int _load_file(const char* path, void** data, size_t* size)
     if (*size == SIZE_MAX)
         goto done;
 
-    if (!(*data = (uint8_t*)malloc(*size + 1)))
+    *data = (uint8_t*)malloc(*size + 1);
+    if (!*data)
         goto done;
 
-        /* Open the file */
+    /* Open the file */
 #ifdef _WIN32
     if (fopen_s(&is, path, "rb") != 0)
 #else
@@ -456,9 +458,25 @@ static int _load_file(const char* path, void** data, size_t* size)
 #endif
         goto done;
 
-    /* Read file into memory */
-    if (fread(*data, 1, *size, is) != *size)
-        goto done;
+    {
+        size_t read = fread(*data, 1, *size, is);
+        OE_TRACE_VERBOSE(
+            "fread returned %zu of expected %zu", read, *size);
+        if (read != *size)
+            goto done;
+    }
+
+    OE_TRACE_ERROR(
+        "Loaded file %s size=%zu first bytes=%02x %02x %02x %02x",
+        path,
+        *size,
+        *size > 0 ? ((uint8_t*)(*data))[0] : 0,
+        *size > 1 ? ((uint8_t*)(*data))[1] : 0,
+        *size > 2 ? ((uint8_t*)(*data))[2] : 0,
+        *size > 3 ? ((uint8_t*)(*data))[3] : 0);
+    OE_TRACE_VERBOSE(
+        "Loaded file sample text: %.32s",
+        *size > 0 ? (const char*)(*data) : "<empty>");
 
     rc = 0;
 
