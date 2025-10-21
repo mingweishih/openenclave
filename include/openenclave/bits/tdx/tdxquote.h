@@ -22,22 +22,30 @@ typedef struct _tdx_attributes_t
         struct
         {
             uint8_t debug : 1;
-            uint8_t reserved : 7;
+            uint8_t reserved0 : 3;
+            uint8_t hgs_plus_prof : 1;
+            uint8_t perf_prof : 1;
+            uint8_t pmt_prof : 1;
+            uint8_t reserved1 : 1;
+            uint8_t reserved2;
         } d;
-        uint8_t u;
-    } tud;
+        uint8_t u[2];
+    } tud_tup;
     union
     {
         struct
         {
-            uint8_t reserved0[2];
-            uint8_t reserved1 : 4;
+            uint8_t icssd : 1;
+            uint8_t servtd_ext : 1;
+            uint8_t reserved0 : 6;
+            uint8_t reserved1 : 3;
+            uint8_t lass : 1;
             uint8_t sept_ve_disable : 1;
-            uint8_t reserved2 : 1;
+            uint8_t migratable : 1;
             uint8_t pks : 1;
             uint8_t kl : 1;
         } d;
-        uint8_t u[3];
+        uint8_t u[2];
     } sec;
     union
     {
