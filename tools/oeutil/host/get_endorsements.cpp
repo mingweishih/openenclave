@@ -232,6 +232,7 @@ int oeutil_get_endorsements(int argc, const char* argv[])
     uint8_t* endorsements_data = nullptr;
     uint32_t endorsements_size = 0;
     oe_result_t result = OE_OK;
+    bool endorsements_allocated = false;
 
     // Parse command line arguments first to handle help
     ret = _parse_args(argc, argv);
@@ -267,6 +268,7 @@ int oeutil_get_endorsements(int argc, const char* argv[])
         goto done;
     }
 
+    endorsements_allocated = true;
     printf("Retrieved TDX endorsements (%u bytes)\n", endorsements_size);
 
     // Write endorsements to output file
@@ -276,7 +278,7 @@ int oeutil_get_endorsements(int argc, const char* argv[])
 done:
     if (evidence_data)
         free(evidence_data);
-    if (endorsements_data)
+    if (endorsements_allocated && endorsements_data)
         oe_free_tdx_endorsements(endorsements_data);
 
     return ret;
